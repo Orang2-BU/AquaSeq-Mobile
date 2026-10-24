@@ -17,6 +17,7 @@ concurrency:
 env:
   CI: '1'
   EXPO_NO_TELEMETRY: '1'
+  EXPO_PUBLIC_API_URL: 'https://api-aquaseq.hadooyy.my.id'
 
 jobs:
   checks:

@@ -1,8 +1,7 @@
 // Satu-satunya pintu ke backend & AI tim. Kontrak lengkap: docs/API-CONTRACT.md.
 //
-// EXPO_PUBLIC_API_URL kosong  -> MODE DEMO: data contoh (seed.ts), login lokal, tidak ada yang dikirim.
-// EXPO_PUBLIC_API_URL terisi  -> semua data dari backend live.
-// EXPO_PUBLIC_AI_URL (opsional) menimpa endpoint saran AI (default: {API_URL}/mobile/ai/mitigasi).
+// EXPO_PUBLIC_API_URL kosong / 'demo' -> MODE DEMO: data contoh (seed.ts), login lokal, tidak ada yang dikirim.
+// Default produksi otomatis nembak backend live jika tidak ada .env (mis. saat build di GitHub Actions/EAS).
 import type { FarmSnapshot, Issue, Mitigation, Pond, Reading, Role, User } from './domain';
 import { seedSnapshot } from './seed';
 import {
@@ -16,7 +15,11 @@ import {
   validCredentials,
 } from './validation';
 
-export const API_URL = normalizeApiUrl(process.env.EXPO_PUBLIC_API_URL);
+const DEFAULT_PROD_URL = 'https://api-aquaseq.hadooyy.my.id';
+const envUrl = process.env.EXPO_PUBLIC_API_URL;
+const isExplicitDemo = envUrl === 'demo' || envUrl === 'none' || envUrl === '';
+
+export const API_URL = isExplicitDemo && envUrl !== undefined ? '' : normalizeApiUrl(envUrl || DEFAULT_PROD_URL);
 export const AI_URL = API_URL ? `${API_URL}/mobile/ai/mitigasi` : '';
 export const isDemo = !API_URL;
 
