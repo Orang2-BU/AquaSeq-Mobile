@@ -10,6 +10,7 @@ import { PressScale } from '@/components/motion';
 import { WaveDivider } from '@/components/WaveDivider';
 import * as api from '@/lib/api';
 import type { Role } from '@/lib/domain';
+import { validCredentials } from '@/lib/validation';
 import { useStore } from '@/lib/store';
 import { card, colors, fonts, gradients } from '@/lib/theme';
 
@@ -28,16 +29,16 @@ export default function Masuk() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = (!api.isDemo || name.trim().length >= 2) && officerId.trim().length >= 3 && /^\d{4,6}$/.test(pin);
+  const valid = validCredentials(officerId, pin, name, api.isDemo);
 
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await signIn({ name: name.trim(), officerId: officerId.trim().toUpperCase(), pin, role });
+      await signIn({ name: name.trim(), officerId: api.isDemo ? officerId.trim().toUpperCase() : officerId.trim(), pin, role });
     } catch (e) {
-      setError(e instanceof api.ApiError && e.status === 401 ? 'ID atau PIN salah.' : 'Gagal masuk. Periksa koneksi lalu coba lagi.');
+      setError(e instanceof api.ApiError ? (e.status === 401 ? (api.isDemo ? 'ID atau PIN salah.' : 'Email atau kata sandi salah.') : e.message) : 'Gagal masuk. Periksa koneksi lalu coba lagi.');
       setBusy(false);
     }
   };
@@ -91,8 +92,8 @@ export default function Masuk() {
               {api.isDemo ? (
                 <Field label="Nama" value={name} onChangeText={setName} placeholder="mis. Budi Santoso" autoCapitalize="words" />
               ) : null}
-              <Field label="ID akun" value={officerId} onChangeText={setOfficerId} placeholder="mis. TK-014" autoCapitalize="characters" />
-              <Field label="PIN (4–6 angka)" value={pin} onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))} placeholder="Masukkan PIN" secure onSubmit={submit} />
+              <Field label={api.isDemo ? "ID akun" : "Email"} value={officerId} onChangeText={setOfficerId} placeholder={api.isDemo ? "mis. TK-014" : "nama@contoh.com"} autoCapitalize={api.isDemo ? "characters" : "none"} />
+              <Field label={api.isDemo ? "PIN (4–6 angka)" : "Kata sandi (10–72 karakter)"} value={pin} onChangeText={(t) => setPin(api.isDemo ? t.replace(/\D/g, '').slice(0, 6) : t)} placeholder={api.isDemo ? "Masukkan PIN" : "Masukkan kata sandi"} secure onSubmit={submit} />
 
               {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -134,7 +135,7 @@ function Field({ label, secure, onSubmit, ...input }: {
         {...input}
         placeholderTextColor={colors.slate}
         secureTextEntry={secure}
-        keyboardType={secure ? 'number-pad' : 'default'}
+        keyboardType={secure && api.isDemo ? 'number-pad' : 'default'}
         autoCorrect={false}
         onSubmitEditing={onSubmit}
         accessibilityLabel={label}

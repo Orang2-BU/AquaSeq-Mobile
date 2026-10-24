@@ -18,14 +18,18 @@ type Persisted = {
   session: Session | null;
   snapshot: FarmSnapshot | null;
   pending: Reading[];
+  quarantinedPending?: Record<string, Reading[]>;
   scheduled: string[];
   settings: Settings;
+  error?: string | null;
 };
 
 type Store = Persisted & {
   ready: boolean;
   online: boolean;
   syncing: boolean;
+  error: string | null;
+  clearError: () => void;
   signIn: (input: api.LoginInput) => Promise<void>;
   signOut: () => void;
   refresh: () => Promise<void>;
@@ -41,8 +45,10 @@ const initial: Persisted = {
   session: null,
   snapshot: null,
   pending: [],
+  quarantinedPending: {},
   scheduled: [],
   settings: { reduceMotion: false },
+  error: null,
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -75,20 +81,63 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => NetInfo.addEventListener((s) => setOnline(s.isConnected !== false)), []);
 
-  const signIn = useCallback(async (input: api.LoginInput) => {
-    const { token, user } = await api.login(input);
-    const snapshot = await api.fetchFarm(token);
-    setState((s) => ({ ...s, session: { token, user, since: new Date().toISOString() }, snapshot }));
-  }, []);
-
-  // Antrean pengecekan yang belum terkirim tetap disimpan saat keluar, supaya tidak hilang.
-  const signOut = useCallback(() => setState((s) => ({ ...s, session: null, snapshot: null })), []);
-
   const refresh = useCallback(async () => {
     const token = stateRef.current.session?.token;
     if (!token) return;
     const snapshot = await api.fetchFarm(token);
-    setState((s) => ({ ...s, snapshot }));
+    setState((s) => ({ ...s, snapshot, error: null }));
+  }, []);
+
+  const signIn = useCallback(async (input: api.LoginInput) => {
+    const { token, user } = await api.login(input);
+    const snapshot = await api.fetchFarm(token);
+    setState((s) => {
+      const prevUserId = s.session?.user.id;
+      const newUserId = user.id;
+
+      const newQuarantine: Record<string, Reading[]> = { ...(s.quarantinedPending ?? {}) };
+      let newPending: Reading[] = s.pending;
+
+      // If user changed and there was pending data, quarantine under prev user so it's not lost
+      if (prevUserId && prevUserId !== newUserId && s.pending.length > 0) {
+        newQuarantine[prevUserId] = [...(newQuarantine[prevUserId] ?? []), ...s.pending];
+        newPending = [];
+      }
+
+      // Restore any quarantined pending readings belonging to new user
+      if (newQuarantine[newUserId] && newQuarantine[newUserId].length > 0) {
+        newPending = [...newPending, ...newQuarantine[newUserId]];
+        delete newQuarantine[newUserId];
+      }
+
+      return {
+        ...s,
+        session: { token, user, since: new Date().toISOString() },
+        snapshot,
+        pending: newPending,
+        quarantinedPending: newQuarantine,
+        error: null,
+      };
+    });
+  }, []);
+
+  // Antrean pengecekan yang belum terkirim tetap disimpan di quarantine saat keluar, supaya tidak hilang.
+  const signOut = useCallback(() => {
+    setState((s) => {
+      const currentUserId = s.session?.user.id;
+      const newQuarantine: Record<string, Reading[]> = { ...(s.quarantinedPending ?? {}) };
+      if (currentUserId && s.pending.length > 0) {
+        newQuarantine[currentUserId] = [...(newQuarantine[currentUserId] ?? []), ...s.pending];
+      }
+      return {
+        ...s,
+        session: null,
+        snapshot: null,
+        pending: [],
+        quarantinedPending: newQuarantine,
+        error: null,
+      };
+    });
   }, []);
 
   const syncPending = useCallback(async () => {
@@ -135,18 +184,49 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const s0 = stateRef.current;
     const task = s0.snapshot?.tasks.find((t) => t.id === id);
     if (!task || !s0.session) return;
-    setState((s) => s.snapshot
-      ? { ...s, snapshot: { ...s.snapshot, tasks: s.snapshot.tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) } }
-      : s);
-    api.setTaskDone(s0.session.token, id, !task.done).catch(() => {});
-  }, []);
+    const prevDone = task.done;
+    const targetDone = !prevDone;
+
+    setState((s) => (s.snapshot
+      ? { ...s, error: null, snapshot: { ...s.snapshot, tasks: s.snapshot.tasks.map((t) => (t.id === id ? { ...t, done: targetDone } : t)) } }
+      : s));
+
+    api.setTaskDone(s0.session.token, id, targetDone).catch((err) => {
+      const msg = err instanceof Error ? err.message : 'Gagal memperbarui status tugas.';
+      setState((s) => (s.snapshot
+        ? {
+            ...s,
+            error: msg,
+            snapshot: {
+              ...s.snapshot,
+              tasks: s.snapshot.tasks.map((t) => (t.id === id ? { ...t, done: prevDone } : t)),
+            },
+          }
+        : { ...s, error: msg }));
+      void refresh().catch(() => {});
+    });
+  }, [refresh]);
 
   const schedule = useCallback((recId: string) => {
     const s0 = stateRef.current;
     if (s0.scheduled.includes(recId) || !s0.session) return false;
-    setState((s) => (s.scheduled.includes(recId) ? s : { ...s, scheduled: [...s.scheduled, recId] }));
-    api.scheduleRecommendation(s0.session.token, recId).catch(() => {});
+
+    setState((s) => ({ ...s, error: null, scheduled: [...s.scheduled, recId] }));
+
+    api.scheduleRecommendation(s0.session.token, recId).catch((err) => {
+      const msg = err instanceof Error ? err.message : 'Gagal menjadwalkan rekomendasi.';
+      setState((s) => ({
+        ...s,
+        error: msg,
+        scheduled: s.scheduled.filter((id) => id !== recId),
+      }));
+      void refresh().catch(() => {});
+    });
     return true;
+  }, [refresh]);
+
+  const clearError = useCallback(() => {
+    setState((s) => ({ ...s, error: null }));
   }, []);
 
   const setSetting = useCallback<Store['setSetting']>((key, value) => {
@@ -154,8 +234,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<Store>(
-    () => ({ ...state, ready, online, syncing, signIn, signOut, refresh, addReading, syncPending, toggleTask, schedule, setSetting }),
-    [state, ready, online, syncing, signIn, signOut, refresh, addReading, syncPending, toggleTask, schedule, setSetting],
+    () => ({
+      ...state,
+      ready,
+      online,
+      syncing,
+      error: state.error ?? null,
+      clearError,
+      signIn,
+      signOut,
+      refresh,
+      addReading,
+      syncPending,
+      toggleTask,
+      schedule,
+      setSetting,
+    }),
+    [state, ready, online, syncing, clearError, signIn, signOut, refresh, addReading, syncPending, toggleTask, schedule, setSetting],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
