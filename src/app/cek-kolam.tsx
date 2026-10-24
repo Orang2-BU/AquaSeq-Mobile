@@ -1,10 +1,10 @@
 // Cek Kolam (teknisi) — modal slide-up + fade backdrop (§6.2).
-// Alur: pilih kolam -> isi 4 nilai cepat (+ uji kit bila ada) -> Simpan -> status & saran mitigasi.
+// Alur: pilih kolam -> ketuk hasil pengamatan (air & udang) -> Simpan -> status & saran mitigasi.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronDown, ChevronUp, CircleCheck, CloudOff, Minus, Plus, X } from 'lucide-react-native';
+import { CircleCheck, CloudOff, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,19 +13,13 @@ import { MitigationCard } from '@/components/MitigationCard';
 import { PressScale } from '@/components/motion';
 import { StatusIconBadge, statusMeta } from '@/components/StatusIconBadge';
 import { easeOut, motion } from '@/lib/animations';
-import { paramStatus, type Reading } from '@/lib/domain';
+import type { Reading } from '@/lib/domain';
 import { useFarm, useMitigation } from '@/lib/farm';
-import { KIT_PARAMS, PARAMS, QUICK_PARAMS, type ParamKey } from '@/lib/params';
+import { LEVEL_PARAMS, PARAMS, PARAM_ORDER, optionOf, type ParamGroup, type ParamKey } from '@/lib/params';
 import { useMotionReduced, useStore } from '@/lib/store';
-import { colors, fonts, gradients, monoNums } from '@/lib/theme';
+import { colors, fonts, gradients } from '@/lib/theme';
 
-// Angka untuk kolom isian: koma desimal, TANPA pemisah ribuan (supaya "8.500" tidak terbaca 8,5).
-const toInput = (k: ParamKey, v: number) => v.toFixed(PARAMS[k].decimals).replace('.', ',');
-
-const parse = (t: string) => {
-  const n = Number(t.replace(/\s/g, '').replace(',', '.'));
-  return t.trim() !== '' && Number.isFinite(n) ? n : null;
-};
+const GROUP_TITLE: Record<ParamGroup, string> = { Air: 'Air kolam', Udang: 'Udang (cek dari anco / senter malam)' };
 
 export default function CekKolam() {
   const router = useRouter();
@@ -38,29 +32,24 @@ export default function CekKolam() {
 
   const ponds = farm?.ponds ?? [];
   const [pondId, setPondId] = useState(params.pond && farm?.byId[params.pond] ? params.pond : ponds[0]?.pond.id ?? '');
-  // Draf per kolam: berpindah kolam tidak menghapus angka yang sudah diisi.
-  const [drafts, setDrafts] = useState<Record<string, Partial<Record<ParamKey, string>>>>({});
-  const [showKit, setShowKit] = useState(false);
+  // Draf per kolam: berpindah kolam tidak menghapus pilihan yang sudah diketuk.
+  // Sengaja tidak diisi otomatis dari pengamatan lalu — teknisi harus benar-benar melihat.
+  const [drafts, setDrafts] = useState<Record<string, Reading['values']>>({});
   const [saved, setSaved] = useState<Reading | null>(null);
 
   const view = farm?.byId[pondId];
-  const draft = drafts[pondId] ?? {};
-  const textOf = (k: ParamKey) => draft[k] ?? (PARAMS[k].quick && view?.latest[k] ? toInput(k, view.latest[k]!.value) : '');
-  const setText = (k: ParamKey, t: string) => setDrafts((d) => ({ ...d, [pondId]: { ...d[pondId], [k]: t } }));
-
-  const step = (k: ParamKey, dir: 1 | -1) => {
-    const c = PARAMS[k];
-    const base = parse(textOf(k)) ?? view?.latest[k]?.value ?? c.min;
-    const next = Math.min(c.max, Math.max(c.min, Math.round((base + dir * c.step) * 1000) / 1000));
-    setText(k, toInput(k, next));
-  };
-
-  const values: Reading['values'] = {};
-  for (const k of [...QUICK_PARAMS, ...(showKit ? KIT_PARAMS : [])]) {
-    const v = parse(textOf(k));
-    if (v !== null) values[k] = v;
-  }
-  const quickComplete = QUICK_PARAMS.every((k) => values[k] !== undefined);
+  const values = drafts[pondId] ?? {};
+  const pick = (k: ParamKey, v: number) =>
+    setDrafts((d) => ({ ...d, [pondId]: { ...d[pondId], [k]: d[pondId]?.[k] === v ? undefined : v } }));
+  // "Sisanya Tidak ada": isi semua tanda di udang yang belum dipilih dengan 0.
+  const restNone = () =>
+    setDrafts((d) => {
+      const cur = { ...d[pondId] };
+      for (const k of LEVEL_PARAMS) if (cur[k] === undefined) cur[k] = 0;
+      return { ...d, [pondId]: cur };
+    });
+  const answered = PARAM_ORDER.filter((k) => values[k] !== undefined).length;
+  const complete = answered === PARAM_ORDER.length;
 
   // --- animasi sheet ---
   const backdrop = useSharedValue(0);
@@ -75,13 +64,14 @@ export default function CekKolam() {
     backdrop.set(withTiming(0, { duration: reduced ? motion.reduced : 250 }));
     if (reduced) sheetOpacity.set(withTiming(0, { duration: motion.reduced }));
     else sheetY.set(withTiming(height, { duration: 250, easing: easeOut }));
-    setTimeout(() => router.back(), reduced ? motion.reduced : 250);
+    // Dibuka langsung dari tautan (tanpa riwayat) -> kembali ke Beranda.
+    setTimeout(() => (router.canGoBack() ? router.back() : router.replace('/beranda')), reduced ? motion.reduced : 250);
   };
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdrop.get() }));
   const sheetStyle = useAnimatedStyle(() => ({ opacity: sheetOpacity.get(), transform: [{ translateY: sheetY.get() }] }));
 
   const save = () => {
-    if (!quickComplete || !view) return;
+    if (!complete || !view) return;
     setSaved(addReading(pondId, values));
     setDrafts((d) => ({ ...d, [pondId]: {} }));
   };
@@ -95,7 +85,7 @@ export default function CekKolam() {
       </Animated.View>
 
       <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 16, maxHeight: height - insets.top - 16 }, sheetStyle]}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flexShrink: 1 }}>
+        <View style={{ flexShrink: 1 }}>
           <View style={styles.head}>
             <Text style={styles.title}>{saved ? 'Hasil Cek' : 'Cek Kolam'}</Text>
             <Pressable onPress={close} hitSlop={10} accessibilityRole="button" accessibilityLabel="Tutup" style={styles.closeBtn}>
@@ -131,69 +121,59 @@ export default function CekKolam() {
                   </ScrollView>
                 </View>
 
-                <View style={styles.group}>
-                  <Text style={styles.groupTitle}>Cek cepat</Text>
-                  <Text style={styles.groupHint}>Terisi nilai terakhir — ubah sesuai hasil ukur sekarang.</Text>
-                  {QUICK_PARAMS.map((k) => <ParamInput key={k} k={k} text={textOf(k)} onText={(t) => setText(k, t)} onStep={(d) => step(k, d)} />)}
-                </View>
-
-                <View style={styles.group}>
-                  <Pressable onPress={() => setShowKit((s) => !s)} accessibilityRole="button" accessibilityState={{ expanded: showKit }} style={styles.kitToggle}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.groupTitle}>Uji kit (opsional)</Text>
-                      <Text style={styles.groupHint}>Amonia, nitrit, alkalinitas, kecerahan — isi yang diukur saja.</Text>
+                {(['Air', 'Udang'] as const).map((g) => (
+                  <View key={g} style={styles.group}>
+                    <View style={styles.groupHead}>
+                      <Text style={styles.groupTitle}>{GROUP_TITLE[g]}</Text>
+                      {g === 'Udang' ? (
+                        <Pressable onPress={restNone} hitSlop={8} accessibilityRole="button" accessibilityLabel="Isi sisanya Tidak ada">
+                          <Text style={styles.restNone}>Sisanya “Tidak ada”</Text>
+                        </Pressable>
+                      ) : null}
                     </View>
-                    {showKit ? <ChevronUp size={22} color={colors.navy} /> : <ChevronDown size={22} color={colors.navy} />}
-                  </Pressable>
-                  {showKit ? KIT_PARAMS.map((k) => <ParamInput key={k} k={k} text={textOf(k)} onText={(t) => setText(k, t)} onStep={(d) => step(k, d)} />) : null}
-                </View>
+                    {PARAM_ORDER.filter((k) => PARAMS[k].group === g).map((k) => (
+                      <ObsInput key={k} k={k} value={values[k]} onPick={(v) => pick(k, v)} />
+                    ))}
+                  </View>
+                ))}
 
-                <PressScale onPress={save} disabled={!quickComplete} accessibilityRole="button" accessibilityLabel="Simpan dan lihat saran" style={[styles.saveBtn, !quickComplete && { opacity: 0.45 }]}>
+                <PressScale onPress={save} disabled={!complete} accessibilityRole="button" accessibilityLabel="Simpan dan lihat saran" style={[styles.saveBtn, !complete && { opacity: 0.45 }]}>
                   <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.saveInner}>
-                    <Text style={styles.saveText}>Simpan & Lihat Saran</Text>
+                    <Text style={styles.saveText}>{complete ? 'Simpan & Lihat Saran' : `Isi semua pengamatan (${answered}/${PARAM_ORDER.length})`}</Text>
                   </LinearGradient>
                 </PressScale>
               </>
             )}
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
       </Animated.View>
     </View>
   );
 }
 
-function ParamInput({ k, text, onText, onStep }: { k: ParamKey; text: string; onText: (t: string) => void; onStep: (d: 1 | -1) => void }) {
+/** Satu pengamatan: nama, cara melihat, lalu pilihan yang tinggal diketuk. */
+function ObsInput({ k, value, onPick }: { k: ParamKey; value: number | undefined; onPick: (v: number) => void }) {
   const c = PARAMS[k];
-  const v = parse(text);
-  const st = v === null ? null : paramStatus(k, v);
-  const m = st ? statusMeta[st] : null;
+  const opt = value === undefined ? undefined : optionOf(k, value);
+  const m = opt ? statusMeta[opt.status] : null;
   const Icon = m?.icon;
   return (
     <View style={styles.row}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.rowLabel}>{c.label}</Text>
+      <Text style={styles.rowLabel}>{c.label}</Text>
+      <Text style={styles.rowHint}>{c.hint}</Text>
+      <View style={styles.options}>
+        {c.options.map((o) => (
+          <Chip key={o.value} label={o.label} active={value === o.value} onPress={() => onPick(o.value)} />
+        ))}
+      </View>
+      {opt && m && Icon ? (
         <View style={styles.rowStatus}>
-          {m && Icon ? <Icon size={13} color={m.color} strokeWidth={2.6} /> : null}
-          <Text style={[styles.rowUnit, m && st !== 'SEHAT' ? { color: m.color } : null]}>
-            {m ? m.label : 'Belum diisi'}{c.unit ? ` · ${c.unit}` : ''}
+          <Icon size={13} color={m.color} strokeWidth={2.6} />
+          <Text style={[styles.rowNote, { color: opt.status === 'SEHAT' ? colors.green : m.color }]}>
+            {m.label}{opt.note ? ` · ${opt.note}` : ''}
           </Text>
         </View>
-      </View>
-      <PressScale onPress={() => onStep(-1)} accessibilityRole="button" accessibilityLabel={`Kurangi ${c.label}`} style={styles.stepBtn}>
-        <Minus size={22} color={colors.navy} strokeWidth={3} />
-      </PressScale>
-      <TextInput
-        value={text}
-        onChangeText={(t) => onText(t.replace(/[^\d.,]/g, ''))}
-        keyboardType="decimal-pad"
-        placeholder="—"
-        placeholderTextColor={colors.slate}
-        accessibilityLabel={`${c.label}${c.unit ? ` dalam ${c.unit}` : ''}`}
-        style={[styles.valueInput, m && st !== 'SEHAT' ? { color: m.color, borderColor: m.stroke ?? colors.border } : null]}
-      />
-      <PressScale onPress={() => onStep(1)} accessibilityRole="button" accessibilityLabel={`Tambah ${c.label}`} style={styles.stepBtn}>
-        <Plus size={22} color={colors.navy} strokeWidth={3} />
-      </PressScale>
+      ) : null}
     </View>
   );
 }
@@ -218,7 +198,7 @@ function Result({ reading, pendingIds, morningTaskOpen, onDoneTask, onAnother, o
       <View style={styles.savedRow}>
         <CircleCheck size={20} color={colors.green} strokeWidth={2.6} />
         <Text style={styles.savedText}>
-          {view.pond.name} · {Object.keys(reading.values).length} parameter {sent ? 'terkirim' : 'tersimpan di HP, menunggu sinkronisasi'}
+          {view.pond.name} · {Object.keys(reading.values).length} pengamatan {sent ? 'terkirim' : 'tersimpan di HP, menunggu sinkronisasi'}
         </Text>
       </View>
       <View style={styles.statusLine}>
@@ -228,7 +208,7 @@ function Result({ reading, pendingIds, morningTaskOpen, onDoneTask, onAnother, o
       {mitigation ? <MitigationCard mitigation={mitigation} ai={ai} title="Saran mitigasi" /> : null}
       {morningTaskOpen ? (
         <PressScale onPress={onDoneTask} accessibilityRole="button" style={styles.ghostBtn}>
-          <Text style={styles.ghostText}>Tandai tugas “Cek kualitas air pagi” selesai</Text>
+          <Text style={styles.ghostText}>Tandai tugas “Cek warna air & anco pagi” selesai</Text>
         </PressScale>
       ) : null}
       <View style={styles.resultBtns}>
@@ -263,18 +243,15 @@ const styles = StyleSheet.create({
   label: { fontFamily: fonts.bodyBold, fontSize: 12, letterSpacing: 0.8, color: colors.slate, marginBottom: 8, textTransform: 'uppercase' },
   chips: { gap: 8 },
   group: { backgroundColor: colors.white, borderRadius: 22, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 4 },
-  groupTitle: { fontFamily: fonts.display, fontSize: 16, color: colors.ink },
-  groupHint: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.slate, marginBottom: 4 },
-  kitToggle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border },
-  rowLabel: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
-  rowStatus: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  rowUnit: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.slate },
-  stepBtn: { width: 44, height: 48, borderRadius: 14, backgroundColor: '#E6EEFF', alignItems: 'center', justifyContent: 'center' },
-  valueInput: {
-    width: 82, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, backgroundColor: '#F7FAFF',
-    textAlign: 'center', fontFamily: fonts.monoBold, fontSize: 20, color: colors.ink, ...monoNums,
-  },
+  groupHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 2 },
+  groupTitle: { flex: 1, fontFamily: fonts.display, fontSize: 16, color: colors.ink },
+  restNone: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.navy },
+  row: { gap: 6, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  rowLabel: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink },
+  rowHint: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.slate },
+  options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  rowStatus: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rowNote: { fontFamily: fonts.bodySemi, fontSize: 12 },
   saveBtn: { borderRadius: 18, overflow: 'hidden' },
   saveInner: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   saveText: { fontFamily: fonts.bodyBold, fontSize: 17, color: colors.white },

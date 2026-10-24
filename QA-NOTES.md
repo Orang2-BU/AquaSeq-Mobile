@@ -12,22 +12,25 @@ pengguna — dicatat di bawah supaya bisa dikonfirmasi ke Fathir.
 2. **Login wajib** (`/masuk`). Mode demo: pilih peran sendiri; dengan backend: peran dari server.
 3. **Semua fitur IoT dihapus**: modul Peralatan (aerator/kincir/genset), toggle ALERT per kolam,
    pengaturan notifikasi ALERT, grafik "24 Jam" (aliran sensor), teks "update otomatis".
-   Data kini dari pengecekan manual teknisi + uji kit + lab.
-4. **Status kolam dihitung** dari nilai terakhir tiap parameter vs batas di `src/lib/params.ts`
+   Parameter fisika/kimia (pH, DO, suhu, dll.), hitungan lab (Vibrio CFU/mL, plankton sel/mL),
+   dan qPCR juga dihapus (2026-10-24). Data kolam kini **pengamatan mata telanjang** yang
+   berpengaruh ke udang: warna air, lapisan alga, udang menyala di malam hari, kotoran putih,
+   ekor & kaki merah, insang hitam/kuning, lumut/lendir di tubuh udang.
+4. **Status kolam dihitung** dari pilihan terakhir tiap pengamatan (status per pilihan di `src/lib/params.ts`)
    (bukan lagi label tetap di data).
 5. **Saran mitigasi**: endpoint AI tim (`/ai/mitigasi`), dengan saran bawaan
    (`src/lib/mitigation-rules.ts`) saat offline / AI belum ada / gagal. Label kartu jujur:
    "Saran AI" vs "Saran cepat".
-6. Input Sampling → **Cek Kolam**: 4 nilai cepat sekaligus (bisa diketik atau −/+), uji kit opsional,
-   lalu langsung tampil status + saran.
+6. Input Sampling → **Cek Kolam**: 7 pengamatan cukup diketuk (warna air: 6 pilihan; lainnya
+   Tidak ada / Sedikit / Banyak), ada tombol "Sisanya Tidak ada", lalu langsung tampil status + saran.
 7. Beranda modul 2×2 dihapus (teknisi: tombol "Cek Kolam Sekarang" + daftar "Perlu tindakan").
 
 ## Asumsi yang perlu dikonfirmasi
 
-- **Batas aman** semua parameter (`params.ts`) adalah nilai umum budidaya vaname, bukan SOP tambak ini.
-  Contoh: DO waspada < 5,0 / kritis < 4,5; amonia waspada > 1,0 / kritis > 2,0; Vibrio waspada > 1.000 CFU/mL.
+- **Status tiap pilihan** (`params.ts`) adalah asumsi awal: Sedikit = waspada, Banyak = kritis;
+  warna air bening / hijau pekat / putih keruh = waspada, merah kecoklatan = kritis.
 - **Isi saran bawaan** (dosis ditulis umum, "ikuti SOP tambak") — perlu ditinjau ahli budidaya.
-- **Data contoh** (`seed.ts`): 12 kolam, nilai uji kit, tebar, berat rata-rata, biomassa, skor risiko,
+- **Data contoh** (`seed.ts`): 12 kolam, pengamatan 7 hari, tebar, berat rata-rata, biomassa, skor risiko,
   rekomendasi, dan nama pencatat ("Shift pagi", "Uji kit sore") — bukan data lapangan.
 - Kolam skor 18 (Rendah) dipetakan ke A1 (spesifikasi menulis `pondId: '—'`).
 - Nama aplikasi **AquaSeq** (ditetapkan pengguna 2026-10-24). `android.package` / `bundleIdentifier` =
@@ -50,9 +53,9 @@ pengguna — dicatat di bawah supaya bisa dikonfirmasi ke Fathir.
 - Splash animasi udang (web): frame berurutan — udang berayun & naik, nama AquaSeq muncul, fade ke halaman Masuk.
 
 - Masuk sebagai teknisi → Beranda teknisi (4 kolam perlu tindakan, saran per kolam).
-- Cek Kolam: A3 DO 4,1 → 5,1 → status A3 berubah Sehat, Beranda turun ke 3 kolam, antrean tersimpan.
-- Keluar → masuk sebagai pemilik → Beranda pemilik (biomassa, SR, kadar zat rata-rata), tab tanpa FAB.
-- Detail C1 versi pemilik: tab Kimia/Fisika/Biologi, tren Amonia, lab, riwayat.
+- Cek Kolam versi pengamatan: lihat bagian uji di bawah.
+- Keluar → masuk sebagai pemilik → Beranda pemilik (biomassa, SR, pengamatan semua kolam), tab tanpa FAB.
+- Detail kolam versi pemilik: tab Air kolam / Udang, riwayat 7 hari (ikon status per hari), daftar pengamatan.
 - `npm run typecheck`, `npm run lint`, `npm run export:web` bersih.
 
 ## Belum diuji

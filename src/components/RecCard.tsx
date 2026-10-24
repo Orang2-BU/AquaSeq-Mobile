@@ -1,7 +1,7 @@
 // Kartu rekomendasi + "Jadwalkan besok" (§8.6e).
 // Terpilih: gradient biru cross-fade 200 ms, centang scale-in 150 ms, label "Terpilih" fade-in 150 ms.
 import { LinearGradient } from 'expo-linear-gradient';
-import { CalendarPlus, Check, Droplet, FlaskConical, Shovel, Wheat, Wind, type LucideIcon } from 'lucide-react-native';
+import { CalendarPlus, Check, Droplet, Eye, FlaskConical, Shovel, Wheat, type LucideIcon } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -11,7 +11,7 @@ import { easeOut, motion } from '@/lib/animations';
 import type { RecIcon, Recommendation } from '@/lib/domain';
 import { colors, fonts, gradients, radius, shadow } from '@/lib/theme';
 
-const ICONS: Record<RecIcon, LucideIcon> = { wind: Wind, wheat: Wheat, flask: FlaskConical, droplet: Droplet, shovel: Shovel };
+const ICONS: Record<RecIcon, LucideIcon> = { wheat: Wheat, flask: FlaskConical, droplet: Droplet, shovel: Shovel, eye: Eye };
 
 export function RecCard({ rec, selected, scheduled, onSelect, onSchedule }: {
   rec: Recommendation;

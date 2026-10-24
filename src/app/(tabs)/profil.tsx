@@ -102,7 +102,7 @@ export default function Profil() {
         <FadeSlideIn index={i++}>
           <Text style={styles.section}>Tentang</Text>
           <View style={[card, styles.group]}>
-            <Row icon={Info} title={`Versi ${Constants.expoConfig?.version ?? '—'}`} detail="Data dari pengecekan manual teknisi dan hasil lab" />
+            <Row icon={Info} title={`Versi ${Constants.expoConfig?.version ?? '—'}`} detail="Data dari pengamatan teknisi di kolam" />
           </View>
         </FadeSlideIn>
 

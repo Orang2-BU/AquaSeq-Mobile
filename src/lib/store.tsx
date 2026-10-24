@@ -8,7 +8,8 @@ import { useReducedMotion } from 'react-native-reanimated';
 import * as api from './api';
 import type { FarmSnapshot, Reading, User } from './domain';
 
-const KEY = 'aquaseq/state/v2';
+// v4: pengamatan visual (warna air & tanda di udang) menggantikan data lama.
+const KEY = 'aquaseq/state/v4';
 
 export type Session = { token: string; user: User; since: string };
 export type Settings = { reduceMotion: boolean };
