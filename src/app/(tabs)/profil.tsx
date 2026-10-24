@@ -22,7 +22,7 @@ export default function Profil() {
   const { user } = session;
 
   const sync = async () => {
-    if (api.isDemo) return toast(`Mode demo: belum ada server. ${pending.length} pengecekan tetap aman di HP.`);
+    if (api.isDemo) return toast(`Belum tersambung ke server. ${pending.length} pengecekan tetap aman di HP.`);
     if (!online) return toast('Sedang offline. Data dikirim otomatis saat kembali online.');
     const r = await syncPending();
     toast(r.failed ? `${r.sent} terkirim, ${r.failed} gagal — dicoba lagi nanti.` : `${r.sent} pengecekan terkirim.`);
@@ -81,12 +81,12 @@ export default function Profil() {
         <FadeSlideIn index={i++}>
           <Text style={styles.section}>Data & sinkronisasi</Text>
           <View style={[card, styles.group]}>
-            <Row
-              icon={Cloud}
-              title={api.isDemo ? 'Mode demo' : 'Server'}
-              detail={api.isDemo ? 'Belum tersambung ke server — data adalah contoh' : `${online ? 'Online' : 'Offline'} · ${api.API_URL.replace(/^https?:\/\//, '')}`}
-            />
-            <Divider />
+            {api.isDemo ? null : (
+              <>
+                <Row icon={Cloud} title="Server" detail={`${online ? 'Online' : 'Offline'} · ${api.API_URL.replace(/^https?:\/\//, '')}`} />
+                <Divider />
+              </>
+            )}
             <Row
               icon={HardDrive}
               title="Tersimpan di HP"

@@ -110,9 +110,6 @@ export default function Masuk() {
                 </LinearGradient>
               </PressScale>
 
-              {api.isDemo ? (
-                <Text style={styles.note}>Mode demo — belum tersambung ke server. Data adalah contoh, dan PIN tidak disimpan.</Text>
-              ) : null}
             </View>
           </FadeSlideIn>
         </View>
@@ -174,5 +171,4 @@ const styles = StyleSheet.create({
   btn: { borderRadius: 16, overflow: 'hidden' },
   btnInner: { flexDirection: 'row', gap: 8, minHeight: 56, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.white },
-  note: { fontFamily: fonts.bodySemi, fontSize: 13, lineHeight: 18, color: colors.slate },
 });

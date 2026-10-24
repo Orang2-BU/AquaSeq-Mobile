@@ -66,7 +66,7 @@ export async function fetchFarm(token: string): Promise<FarmSnapshot> {
 
 /** Kirim pengecekan manual. Mode demo: tidak ada server, data tetap "menunggu sinkronisasi". */
 export async function submitReading(token: string, reading: Reading): Promise<void> {
-  if (isDemo) throw new ApiError('Mode demo — belum ada server');
+  if (isDemo) throw new ApiError('Belum tersambung ke server');
   await request<void>(`${API_URL}/readings`, { method: 'POST', token, body: { ...reading, synced: undefined } });
 }
 

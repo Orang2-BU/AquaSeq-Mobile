@@ -12,7 +12,6 @@ import { Chip } from '@/components/Chip';
 import { MitigationCard } from '@/components/MitigationCard';
 import { PressScale } from '@/components/motion';
 import { StatusIconBadge, statusMeta } from '@/components/StatusIconBadge';
-import * as api from '@/lib/api';
 import { easeOut, motion } from '@/lib/animations';
 import { paramStatus, type Reading } from '@/lib/domain';
 import { useFarm, useMitigation } from '@/lib/farm';
@@ -107,7 +106,7 @@ export default function CekKolam() {
           {!online ? (
             <View style={styles.offline}>
               <CloudOff size={16} color={colors.amber} strokeWidth={2.4} />
-              <Text style={styles.offlineText}>Offline — hasil disimpan di HP dan dikirim saat online. Saran memakai aturan bawaan.</Text>
+              <Text style={styles.offlineText}>Offline — hasil disimpan di HP dan dikirim saat online.</Text>
             </View>
           ) : null}
 
@@ -219,7 +218,7 @@ function Result({ reading, pendingIds, morningTaskOpen, onDoneTask, onAnother, o
       <View style={styles.savedRow}>
         <CircleCheck size={20} color={colors.green} strokeWidth={2.6} />
         <Text style={styles.savedText}>
-          {view.pond.name} · {Object.keys(reading.values).length} parameter {sent ? 'terkirim' : api.isDemo ? 'tersimpan di HP (mode demo)' : 'tersimpan di HP, menunggu sinkronisasi'}
+          {view.pond.name} · {Object.keys(reading.values).length} parameter {sent ? 'terkirim' : 'tersimpan di HP, menunggu sinkronisasi'}
         </Text>
       </View>
       <View style={styles.statusLine}>

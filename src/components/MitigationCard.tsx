@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FadeText } from './motion';
 import { statusMeta, statusStroke } from './StatusIconBadge';
-import * as api from '@/lib/api';
 import type { Mitigation } from '@/lib/domain';
 import type { AiState } from '@/lib/farm';
 import { useStore } from '@/lib/store';
@@ -30,7 +29,7 @@ export function MitigationCard({ mitigation, ai, compact = false, title, onOpen 
     : ai === 'loading' ? 'Saran cepat · meminta saran AI…'
       : ai === 'error' ? 'Saran cepat · AI tidak bisa dihubungi'
         : !online ? 'Saran cepat · offline'
-          : api.AI_URL ? 'Saran cepat' : 'Saran cepat (aturan bawaan)';
+          : 'Saran cepat';
 
   return (
     <View style={[card, styles.card, statusStroke(mitigation.severity)]}>
