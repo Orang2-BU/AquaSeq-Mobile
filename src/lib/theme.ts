@@ -60,7 +60,7 @@ export const card: ViewStyle = {
   ...shadow,
 };
 
-// Angka sensor selalu mono tabular.
+// Angka hitungan (CFU/mL, sel/mL, %) selalu mono tabular.
 export const monoNums: TextStyle = { fontVariant: ['tabular-nums'] };
 
 /** Format angka Indonesia: 4.1 -> "4,1", 2500 -> "2.500". */

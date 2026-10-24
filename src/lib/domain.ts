@@ -19,7 +19,7 @@ export type Pond = {
   abwGram: number;       // berat rata-rata udang dari sampling terakhir (gram)
 };
 
-/** Satu kali pengecekan manual oleh teknisi atau hasil lab. */
+/** Satu kali input mandiri: hitung koloni, hitung plankton, atau hasil qPCR (0 = negatif, 1 = positif). */
 export type Reading = {
   id: string;
   pondId: string;
@@ -33,17 +33,14 @@ export type Task = { id: string; title: string; time: string; note: string; done
 
 export type RiskScore = { pondId: string; score: number; label: 'Tinggi' | 'Sedang' | 'Rendah'; context: string };
 
-export type LabResult = { pondId: string | null; marker: string; result: string; detected: boolean };
-
-export type RecIcon = 'wind' | 'wheat' | 'flask' | 'droplet' | 'shovel';
+export type RecIcon = 'wind' | 'wheat' | 'flask' | 'droplet' | 'shovel' | 'microscope';
 export type Recommendation = { id: string; icon: RecIcon; text: string };
 
 export type FarmSnapshot = {
   farm: Farm;
   ponds: Pond[];
-  readings: Reading[];   // riwayat pengecekan, termasuk yang terbaru
-  labResults: LabResult[];
-  labTitle: string;      // mis. "Hasil Lab qPCR · DOC 42"
+  readings: Reading[];   // riwayat pengecekan (hitung bakteri, plankton, qPCR), termasuk yang terbaru
+  labTitle: string;      // judul ringkasan qPCR, mis. "Hasil Lab qPCR · DOC 42"
   riskScores: RiskScore[];
   recommendations: Recommendation[];
   tasks: Task[];
@@ -95,8 +92,9 @@ export function paramStatus(key: ParamKey, value: number): PondStatus {
   return statusOf(evaluate({ [key]: value }));
 }
 
-/** "DO 4,1 mg/L di bawah batas 5,0" */
+/** "Vibrio 15.000 CFU/mL di atas batas 1.000" · "EHP positif (qPCR)" */
 export function describeIssue(i: Issue): string {
+  if (PARAMS[i.param].kind === 'binary') return `${shortName(i.param)} positif (qPCR)`;
   return `${shortName(i.param)} ${fmtParam(i.param, i.value)} ${i.direction === 'rendah' ? 'di bawah' : 'di atas'} batas ${fmtParam(i.param, i.limit, false)}`;
 }
 

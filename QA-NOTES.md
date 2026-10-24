@@ -12,22 +12,27 @@ pengguna — dicatat di bawah supaya bisa dikonfirmasi ke Fathir.
 2. **Login wajib** (`/masuk`). Mode demo: pilih peran sendiri; dengan backend: peran dari server.
 3. **Semua fitur IoT dihapus**: modul Peralatan (aerator/kincir/genset), toggle ALERT per kolam,
    pengaturan notifikasi ALERT, grafik "24 Jam" (aliran sensor), teks "update otomatis".
-   Data kini dari pengecekan manual teknisi + uji kit + lab.
+   Parameter fisika/kimia (pH, DO, suhu, salinitas, amonia, nitrit, dll.) juga dihapus (2026-10-24).
+   Data kolam kini **mikroba** yang diinput mandiri: bakteri (Vibrio, Vibrio hijau, TPC, Bacillus),
+   plankton (total, diatom, alga hijau, alga biru-hijau, dinoflagellata), dan patogen qPCR
+   (WSSV, AHPND, EHP, IHHNV; 0 = negatif, 1 = positif).
 4. **Status kolam dihitung** dari nilai terakhir tiap parameter vs batas di `src/lib/params.ts`
    (bukan lagi label tetap di data).
 5. **Saran mitigasi**: endpoint AI tim (`/ai/mitigasi`), dengan saran bawaan
    (`src/lib/mitigation-rules.ts`) saat offline / AI belum ada / gagal. Label kartu jujur:
    "Saran AI" vs "Saran cepat".
-6. Input Sampling → **Cek Kolam**: 4 nilai cepat sekaligus (bisa diketik atau −/+), uji kit opsional,
+6. Input Sampling → **Cek Kolam**: 4 hitungan cepat (Vibrio, Vibrio hijau, plankton, alga biru-hijau),
+   hitungan lain & hasil qPCR opsional,
    lalu langsung tampil status + saran.
 7. Beranda modul 2×2 dihapus (teknisi: tombol "Cek Kolam Sekarang" + daftar "Perlu tindakan").
 
 ## Asumsi yang perlu dikonfirmasi
 
 - **Batas aman** semua parameter (`params.ts`) adalah nilai umum budidaya vaname, bukan SOP tambak ini.
-  Contoh: DO waspada < 5,0 / kritis < 4,5; amonia waspada > 1,0 / kritis > 2,0; Vibrio waspada > 1.000 CFU/mL.
+  Contoh: Vibrio waspada > 1.000 / kritis > 10.000 CFU/mL; Vibrio hijau waspada > 100 / kritis > 1.000;
+  alga biru-hijau waspada > 20% / kritis > 40%; WSSV & AHPND positif = kritis, EHP & IHHNV positif = waspada.
 - **Isi saran bawaan** (dosis ditulis umum, "ikuti SOP tambak") — perlu ditinjau ahli budidaya.
-- **Data contoh** (`seed.ts`): 12 kolam, nilai uji kit, tebar, berat rata-rata, biomassa, skor risiko,
+- **Data contoh** (`seed.ts`): 12 kolam, hitungan bakteri & plankton, hasil qPCR, tebar, berat rata-rata, biomassa, skor risiko,
   rekomendasi, dan nama pencatat ("Shift pagi", "Uji kit sore") — bukan data lapangan.
 - Kolam skor 18 (Rendah) dipetakan ke A1 (spesifikasi menulis `pondId: '—'`).
 - Nama aplikasi **AquaSeq** (ditetapkan pengguna 2026-10-24). `android.package` / `bundleIdentifier` =
@@ -50,9 +55,9 @@ pengguna — dicatat di bawah supaya bisa dikonfirmasi ke Fathir.
 - Splash animasi udang (web): frame berurutan — udang berayun & naik, nama AquaSeq muncul, fade ke halaman Masuk.
 
 - Masuk sebagai teknisi → Beranda teknisi (4 kolam perlu tindakan, saran per kolam).
-- Cek Kolam: A3 DO 4,1 → 5,1 → status A3 berubah Sehat, Beranda turun ke 3 kolam, antrean tersimpan.
-- Keluar → masuk sebagai pemilik → Beranda pemilik (biomassa, SR, kadar zat rata-rata), tab tanpa FAB.
-- Detail C1 versi pemilik: tab Kimia/Fisika/Biologi, tren Amonia, lab, riwayat.
+- Cek Kolam: A3 Vibrio diturunkan ke batas aman → status A3 berubah, Beranda ikut berubah, antrean tersimpan.
+- Keluar → masuk sebagai pemilik → Beranda pemilik (biomassa, SR, rata-rata bakteri & plankton, ringkasan qPCR), tab tanpa FAB.
+- Detail kolam versi pemilik: tab Bakteri/Plankton/qPCR, tren Vibrio, riwayat.
 - `npm run typecheck`, `npm run lint`, `npm run export:web` bersih.
 
 ## Belum diuji

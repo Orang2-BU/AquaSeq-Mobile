@@ -1,13 +1,13 @@
-// Parameter kualitas air yang diukur MANUAL oleh teknisi (test kit / lab), bukan sensor.
-// Batas di sini adalah nilai awal yang wajar untuk udang vaname — sesuaikan dengan SOP tambak
-// (atau biarkan backend mengirim batasnya sendiri lewat FarmSnapshot.thresholds).
+// Parameter MIKROBA kolam yang diinput mandiri oleh teknisi / lab (hitung koloni TCBS & TPC,
+// hitung plankton di mikroskop, hasil qPCR). Tidak ada parameter sensor (pH, DO, suhu, dll.).
+// Batas di sini adalah nilai awal — sesuaikan dengan SOP tambak atau kirim dari backend.
 
 export type ParamKey =
-  | 'DO' | 'pH' | 'Suhu' | 'Salinitas' | 'Kecerahan'
-  | 'Amonia' | 'Nitrit' | 'Nitrat' | 'Alkalinitas' | 'Kesadahan' | 'TOM' | 'Fosfat' | 'H2S'
-  | 'Vibrio';
+  | 'Vibrio' | 'VibrioHijau' | 'TotalBakteri' | 'Bacillus'
+  | 'Plankton' | 'Diatom' | 'AlgaHijau' | 'BGA' | 'Dino'
+  | 'WSSV' | 'AHPND' | 'EHP' | 'IHHNV';
 
-export type ParamGroup = 'Fisika' | 'Kimia' | 'Biologi';
+export type ParamGroup = 'Bakteri' | 'Plankton' | 'Patogen';
 
 /** Batas: di luar `warn` = WASPADA, di luar `crit` = KRITIS. */
 export type Limits = {
@@ -18,75 +18,96 @@ export type Limits = {
 export type ParamConfig = {
   key: ParamKey;
   label: string;
+  short: string;
   unit: string;
+  /** 'number' = hitungan; 'binary' = hasil qPCR (0 = negatif, 1 = positif). */
+  kind: 'number' | 'binary';
   decimals: number;
   step: number;
   min: number;
   max: number;
   group: ParamGroup;
-  /** Diisi teknisi di "Cek cepat". Yang lain ada di bagian "Uji kit / lab (opsional)". */
+  /** Diisi teknisi di "Cek cepat". Sisanya di bagian opsional. */
   quick: boolean;
   limits: Limits;
 };
 
 const p = (c: ParamConfig) => c;
+const binary = (key: ParamKey, label: string, severe: boolean): ParamConfig => ({
+  key, label, short: key, unit: '', kind: 'binary', decimals: 0, step: 1, min: 0, max: 1, group: 'Patogen', quick: false,
+  // Positif = di atas 0,5. WSSV & AHPND langsung kritis; EHP & IHHNV waspada.
+  limits: severe ? { warn: { max: 0.5 }, crit: { max: 0.5 } } : { warn: { max: 0.5 }, crit: {} },
+});
 
 export const PARAMS: Record<ParamKey, ParamConfig> = {
-  DO: p({ key: 'DO', label: 'Oksigen terlarut (DO)', unit: 'mg/L', decimals: 1, step: 0.1, min: 0, max: 15, group: 'Kimia', quick: true,
-    limits: { warn: { min: 5.0 }, crit: { min: 4.5 } } }),
-  pH: p({ key: 'pH', label: 'pH', unit: '', decimals: 1, step: 0.1, min: 5, max: 10, group: 'Kimia', quick: true,
-    limits: { warn: { min: 7.5, max: 8.5 }, crit: { min: 7.0, max: 9.0 } } }),
-  Suhu: p({ key: 'Suhu', label: 'Suhu air', unit: '°C', decimals: 1, step: 0.5, min: 20, max: 38, group: 'Fisika', quick: true,
-    limits: { warn: { min: 28, max: 32 }, crit: { min: 26, max: 34 } } }),
-  Salinitas: p({ key: 'Salinitas', label: 'Salinitas', unit: 'ppt', decimals: 0, step: 1, min: 0, max: 45, group: 'Kimia', quick: true,
-    limits: { warn: { min: 15, max: 30 }, crit: { min: 5, max: 40 } } }),
-  Kecerahan: p({ key: 'Kecerahan', label: 'Kecerahan', unit: 'cm', decimals: 0, step: 5, min: 0, max: 150, group: 'Fisika', quick: false,
-    limits: { warn: { min: 30, max: 60 }, crit: { min: 20, max: 80 } } }),
-  Amonia: p({ key: 'Amonia', label: 'Amonia (TAN)', unit: 'mg/L', decimals: 2, step: 0.05, min: 0, max: 10, group: 'Kimia', quick: false,
-    limits: { warn: { max: 1.0 }, crit: { max: 2.0 } } }),
-  Nitrit: p({ key: 'Nitrit', label: 'Nitrit (NO₂)', unit: 'mg/L', decimals: 2, step: 0.05, min: 0, max: 10, group: 'Kimia', quick: false,
-    limits: { warn: { max: 0.5 }, crit: { max: 1.0 } } }),
-  Nitrat: p({ key: 'Nitrat', label: 'Nitrat (NO₃)', unit: 'mg/L', decimals: 1, step: 1, min: 0, max: 200, group: 'Kimia', quick: false,
-    limits: { warn: { max: 60 }, crit: { max: 100 } } }),
-  Alkalinitas: p({ key: 'Alkalinitas', label: 'Alkalinitas', unit: 'mg/L', decimals: 0, step: 5, min: 0, max: 300, group: 'Kimia', quick: false,
-    limits: { warn: { min: 100, max: 200 }, crit: { min: 80, max: 250 } } }),
-  Kesadahan: p({ key: 'Kesadahan', label: 'Kesadahan', unit: 'mg/L', decimals: 0, step: 50, min: 0, max: 8000, group: 'Kimia', quick: false,
-    limits: { warn: { min: 500 }, crit: { min: 300 } } }),
-  TOM: p({ key: 'TOM', label: 'Bahan organik (TOM)', unit: 'mg/L', decimals: 0, step: 5, min: 0, max: 300, group: 'Kimia', quick: false,
-    limits: { warn: { max: 90 }, crit: { max: 120 } } }),
-  Fosfat: p({ key: 'Fosfat', label: 'Fosfat (PO₄)', unit: 'mg/L', decimals: 2, step: 0.05, min: 0, max: 10, group: 'Kimia', quick: false,
-    limits: { warn: { max: 1.0 }, crit: { max: 2.0 } } }),
-  H2S: p({ key: 'H2S', label: 'Hidrogen sulfida (H₂S)', unit: 'mg/L', decimals: 3, step: 0.005, min: 0, max: 1, group: 'Kimia', quick: false,
-    limits: { warn: { max: 0.01 }, crit: { max: 0.05 } } }),
-  Vibrio: p({ key: 'Vibrio', label: 'Total Vibrio', unit: 'CFU/mL', decimals: 0, step: 100, min: 0, max: 1_000_000, group: 'Biologi', quick: false,
-    limits: { warn: { max: 1000 }, crit: { max: 10000 } } }),
+  Vibrio: p({ key: 'Vibrio', label: 'Total Vibrio (TCBS)', short: 'Vibrio', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 100, min: 0, max: 10_000_000, group: 'Bakteri', quick: true,
+    limits: { warn: { max: 1_000 }, crit: { max: 10_000 } } }),
+  VibrioHijau: p({ key: 'VibrioHijau', label: 'Vibrio koloni hijau', short: 'Vibrio hijau', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 10, min: 0, max: 1_000_000, group: 'Bakteri', quick: true,
+    limits: { warn: { max: 100 }, crit: { max: 1_000 } } }),
+  TotalBakteri: p({ key: 'TotalBakteri', label: 'Total bakteri (TPC)', short: 'Total bakteri', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 10_000, min: 0, max: 100_000_000, group: 'Bakteri', quick: false,
+    limits: { warn: { max: 1_000_000 }, crit: { max: 10_000_000 } } }),
+  Bacillus: p({ key: 'Bacillus', label: 'Probiotik Bacillus', short: 'Bacillus', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 1_000, min: 0, max: 100_000_000, group: 'Bakteri', quick: false,
+    limits: { warn: { min: 10_000 }, crit: { min: 1_000 } } }),
+  Plankton: p({ key: 'Plankton', label: 'Total plankton', short: 'Plankton', unit: 'sel/mL', kind: 'number', decimals: 0, step: 5_000, min: 0, max: 10_000_000, group: 'Plankton', quick: true,
+    limits: { warn: { min: 50_000, max: 1_000_000 }, crit: { min: 10_000, max: 3_000_000 } } }),
+  Diatom: p({ key: 'Diatom', label: 'Diatom', short: 'Diatom', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: false,
+    limits: { warn: { min: 20 }, crit: { min: 10 } } }),
+  AlgaHijau: p({ key: 'AlgaHijau', label: 'Alga hijau (Chlorophyta)', short: 'Alga hijau', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: false,
+    limits: { warn: {}, crit: {} } }),
+  BGA: p({ key: 'BGA', label: 'Alga biru-hijau (BGA)', short: 'Alga biru-hijau', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: true,
+    limits: { warn: { max: 20 }, crit: { max: 40 } } }),
+  Dino: p({ key: 'Dino', label: 'Dinoflagellata', short: 'Dinoflagellata', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: false,
+    limits: { warn: { max: 10 }, crit: { max: 20 } } }),
+  WSSV: binary('WSSV', 'WSSV (bintik putih)', true),
+  AHPND: binary('AHPND', 'AHPND / EMS', true),
+  EHP: binary('EHP', 'EHP (mikrosporidia)', false),
+  IHHNV: binary('IHHNV', 'IHHNV', false),
 };
 
 export const PARAM_ORDER: ParamKey[] = [
-  'DO', 'pH', 'Suhu', 'Salinitas', 'Kecerahan',
-  'Amonia', 'Nitrit', 'Nitrat', 'Alkalinitas', 'Kesadahan', 'TOM', 'Fosfat', 'H2S', 'Vibrio',
+  'Vibrio', 'VibrioHijau', 'TotalBakteri', 'Bacillus',
+  'Plankton', 'Diatom', 'AlgaHijau', 'BGA', 'Dino',
+  'WSSV', 'AHPND', 'EHP', 'IHHNV',
 ];
 
 export const QUICK_PARAMS = PARAM_ORDER.filter((k) => PARAMS[k].quick);
-export const KIT_PARAMS: ParamKey[] = ['Amonia', 'Nitrit', 'Alkalinitas', 'Kecerahan'];
+/** Opsional di Cek Kolam: hitungan tambahan (bukan cek cepat, bukan qPCR). */
+export const EXTRA_PARAMS = PARAM_ORDER.filter((k) => !PARAMS[k].quick && PARAMS[k].kind === 'number');
+export const PATHOGEN_PARAMS = PARAM_ORDER.filter((k) => PARAMS[k].kind === 'binary');
+/** Parameter angka yang bisa digambar trennya. */
+export const NUMERIC_PARAMS = PARAM_ORDER.filter((k) => PARAMS[k].kind === 'number');
 
-/** Nama pendek untuk kalimat & chip, mis. "DO", "Amonia", "H₂S". */
+/** Nama pendek untuk kalimat & chip, mis. "Vibrio hijau". */
 export function shortName(key: ParamKey): string {
-  return key === 'H2S' ? 'H₂S' : key;
+  return PARAMS[key].short;
 }
 
 export function fmtParam(key: ParamKey, value: number, withUnit = true): string {
   const c = PARAMS[key];
+  if (c.kind === 'binary') return value > 0.5 ? 'Positif' : 'Negatif';
   const n = value.toLocaleString('id-ID', { minimumFractionDigits: c.decimals, maximumFractionDigits: c.decimals });
-  return withUnit && c.unit ? `${n} ${c.unit}` : n;
+  if (!withUnit || !c.unit) return n;
+  return c.unit === '%' ? `${n}%` : `${n} ${c.unit}`;
 }
 
-/** Teks batas aman singkat, mis. "5,0–" atau "7,5–8,5". */
+/** Teks batas aman singkat, mis. "≤ 1.000" atau "50.000–1.000.000". */
 export function safeRange(key: ParamKey): string {
-  const { warn } = PARAMS[key].limits;
+  const c = PARAMS[key];
+  if (c.kind === 'binary') return 'Negatif';
+  const { warn } = c.limits;
   const f = (v: number) => fmtParam(key, v, false);
   if (warn.min !== undefined && warn.max !== undefined) return `${f(warn.min)}–${f(warn.max)}`;
   if (warn.min !== undefined) return `≥ ${f(warn.min)}`;
   if (warn.max !== undefined) return `≤ ${f(warn.max)}`;
-  return '—';
+  return 'tidak dibatasi';
+}
+
+/** Kalimat batas lengkap untuk tabel & grafik, mis. "Batas aman ≤ 1.000 CFU/mL". */
+export function limitText(key: ParamKey): string {
+  const c = PARAMS[key];
+  if (c.kind === 'binary') return 'Aman bila negatif';
+  const { warn } = c.limits;
+  if (warn.min === undefined && warn.max === undefined) return 'Komposisi, tanpa batas';
+  const unit = !c.unit ? '' : c.unit === '%' ? '%' : ` ${c.unit}`;
+  return `Batas aman ${safeRange(key)}${unit}`;
 }

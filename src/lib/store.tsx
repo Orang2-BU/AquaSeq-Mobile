@@ -8,7 +8,8 @@ import { useReducedMotion } from 'react-native-reanimated';
 import * as api from './api';
 import type { FarmSnapshot, Reading, User } from './domain';
 
-const KEY = 'aquaseq/state/v2';
+// v3: parameter mikroba (bakteri, plankton, qPCR) menggantikan parameter sensor lama.
+const KEY = 'aquaseq/state/v3';
 
 export type Session = { token: string; user: User; since: string };
 export type Settings = { reduceMotion: boolean };

@@ -1,4 +1,4 @@
-// Grafik tren satu parameter dari pengecekan manual + garis batas aman putus-putus.
+// Grafik tren satu parameter dari input mandiri + garis batas aman putus-putus.
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
@@ -8,7 +8,7 @@ import { PARAMS, fmtParam, type ParamKey } from '@/lib/params';
 import { colors, fonts } from '@/lib/theme';
 
 const H = 170;
-const PAD = { l: 40, r: 12, t: 14, b: 26 };
+const PAD = { l: 58, r: 12, t: 14, b: 26 }; // kiri lebar: label sumbu bisa "1.000.000"
 
 export function TrendChart({ param, data }: { param: ParamKey; data: { label: string; value: number }[] }) {
   const [w, setW] = useState(0);
@@ -18,7 +18,7 @@ export function TrendChart({ param, data }: { param: ParamKey; data: { label: st
   const lo = Math.min(...values, ...lines);
   const hi = Math.max(...values, ...lines);
   const pad = (hi - lo || Math.abs(hi) || 1) * 0.15;
-  const min = lo - pad;
+  const min = Math.max(PARAMS[param].min, lo - pad); // hitungan tidak pernah negatif
   const max = hi + pad;
   const innerW = Math.max(w - PAD.l - PAD.r, 1);
   const innerH = H - PAD.t - PAD.b;

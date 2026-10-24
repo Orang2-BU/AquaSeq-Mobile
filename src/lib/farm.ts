@@ -6,7 +6,7 @@ import {
   evaluate, statusOf, statusRank, type FarmSnapshot, type Issue, type Mitigation, type Pond, type PondStatus, type Reading,
 } from './domain';
 import { localMitigation } from './mitigation-rules';
-import { PARAM_ORDER, type ParamKey } from './params';
+import { PARAM_ORDER, PATHOGEN_PARAMS, type ParamKey } from './params';
 import { useStore } from './store';
 
 export type LatestValue = { value: number; at: string; by: string; synced: boolean };
@@ -50,6 +50,20 @@ function build(snapshot: FarmSnapshot, pending: Reading[]): FarmView {
 export function useFarm(): FarmView | null {
   const { snapshot, pending } = useStore();
   return useMemo(() => (snapshot ? build(snapshot, pending) : null), [snapshot, pending]);
+}
+
+/** Ringkasan qPCR terakhir per patogen: kolam yang positif dan berapa kolam yang sudah diuji. */
+export function pathogenSummary(farm: FarmView, pondId?: string) {
+  const views = pondId ? farm.ponds.filter((v) => v.pond.id === pondId) : farm.ponds;
+  return PATHOGEN_PARAMS.map((key) => {
+    const tested = views.filter((v) => v.latest[key] !== undefined);
+    return {
+      key,
+      tested: tested.length,
+      positives: tested.filter((v) => (v.latest[key]?.value ?? 0) > 0.5).map((v) => v.pond.id),
+      at: tested.map((v) => v.latest[key]!.at).sort().pop(),
+    };
+  });
 }
 
 /** Nilai satu parameter dari pengecekan-pengecekan terakhir (untuk grafik tren). */

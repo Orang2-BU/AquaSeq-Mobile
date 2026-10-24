@@ -1,10 +1,10 @@
-// Tabel kadar parameter untuk pemilik: nilai terakhir, batas aman, status, kapan dicek.
+// Tabel hasil per parameter untuk pemilik: nilai terakhir, batas aman, status, kapan diinput.
 import { StyleSheet, Text, View } from 'react-native';
 
 import { statusMeta } from './StatusIconBadge';
 import { paramStatus, wibDay, wibTime } from '@/lib/domain';
 import type { LatestValue } from '@/lib/farm';
-import { PARAMS, fmtParam, safeRange, type ParamKey } from '@/lib/params';
+import { PARAMS, fmtParam, limitText, type ParamKey } from '@/lib/params';
 import { colors, fonts, monoNums } from '@/lib/theme';
 
 export function ParamTable({ keys, latest }: { keys: ParamKey[]; latest: Partial<Record<ParamKey, LatestValue>> }) {
@@ -20,7 +20,7 @@ export function ParamTable({ keys, latest }: { keys: ParamKey[]; latest: Partial
           <View key={k} style={[styles.row, idx > 0 && styles.divider]}>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={styles.label}>{c.label}</Text>
-              <Text style={styles.range}>Batas aman {safeRange(k)}{c.unit ? ` ${c.unit}` : ''}</Text>
+              <Text style={styles.range}>{limitText(k)}</Text>
               {l ? <Text style={styles.when}>{wibDay(l.at)} {wibTime(l.at)} · {l.by}</Text> : null}
             </View>
             <View style={styles.right}>

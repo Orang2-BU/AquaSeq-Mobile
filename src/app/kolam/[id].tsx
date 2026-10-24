@@ -1,8 +1,8 @@
 // Detail Kolam. Teknisi: saran mitigasi dulu, lalu 4 nilai utama dan tombol cek ulang.
-// Pemilik: saran + semua kadar zat per kelompok (fisika/kimia/biologi), tren, lab, riwayat.
+// Pemilik: saran + semua hasil per kelompok (bakteri/plankton/patogen qPCR), tren, riwayat.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ClipboardCheck, FlaskConical, Microscope, Thermometer, TriangleAlert } from 'lucide-react-native';
+import { ArrowLeft, Bug, ClipboardCheck, Dna, Leaf, TriangleAlert } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -20,7 +20,7 @@ import { TrendChart } from '@/components/TrendChart';
 import { easeOut } from '@/lib/animations';
 import { biomassKg, describeIssue, paramStatus, wibDay, wibTime } from '@/lib/domain';
 import { paramHistory, useFarm, useMitigation, type FarmView, type PondView } from '@/lib/farm';
-import { PARAMS, PARAM_ORDER, QUICK_PARAMS, fmtParam, safeRange, shortName, type ParamGroup, type ParamKey } from '@/lib/params';
+import { NUMERIC_PARAMS, PARAMS, PARAM_ORDER, QUICK_PARAMS, fmtParam, limitText, safeRange, shortName, type ParamGroup, type ParamKey } from '@/lib/params';
 import { useStore } from '@/lib/store';
 import { card, colors, fonts, gradients, monoNums } from '@/lib/theme';
 
@@ -111,7 +111,7 @@ export default function DetailKolam() {
   );
 }
 
-/** Teknisi: 4 nilai utama besar + masalah lain dari uji kit (kalau ada). */
+/** Teknisi: 4 hitungan utama besar + masalah lain dari hitungan tambahan / qPCR (kalau ada). */
 function TechSections({ view, start }: { view: PondView; start: number }) {
   const kitIssues = view.issues.filter((x) => !PARAMS[x.param].quick);
   return (
@@ -145,7 +145,7 @@ function TechSections({ view, start }: { view: PondView; start: number }) {
       {kitIssues.length ? (
         <FadeSlideIn index={start + 1}>
           <View style={card}>
-            <Text style={styles.cardTitle}>Dari uji kit / lab</Text>
+            <Text style={styles.cardTitle}>Dari hitungan lain & qPCR</Text>
             {kitIssues.map((x) => {
               const m = statusMeta[x.severity];
               const Icon = m.icon;
@@ -164,18 +164,18 @@ function TechSections({ view, start }: { view: PondView; start: number }) {
 }
 
 const GROUPS = [
-  { key: 'Kimia', label: 'Kimia', icon: FlaskConical },
-  { key: 'Fisika', label: 'Fisika', icon: Thermometer },
-  { key: 'Biologi', label: 'Biologi', icon: Microscope },
+  { key: 'Bakteri', label: 'Bakteri', icon: Bug },
+  { key: 'Plankton', label: 'Plankton', icon: Leaf },
+  { key: 'Patogen', label: 'qPCR', icon: Dna },
 ] as const;
 
-const TREND_PARAMS: ParamKey[] = ['DO', 'pH', 'Amonia', 'Nitrit', 'Alkalinitas', 'TOM', 'Vibrio', 'Suhu', 'Salinitas'];
+const TREND_PARAMS = NUMERIC_PARAMS;
 
-/** Pemilik: semua kadar zat, tren per parameter, hasil lab, riwayat pengecekan. */
+/** Pemilik: semua hasil bakteri, plankton & qPCR, tren per parameter, riwayat pengecekan. */
 function OwnerSections({ view, farm, start }: { view: PondView; farm: FarmView; start: number }) {
-  const [group, setGroup] = useState<ParamGroup>('Kimia');
+  const [group, setGroup] = useState<ParamGroup>('Bakteri');
   const firstIssue = view.issues[0]?.param;
-  const [param, setParam] = useState<ParamKey>(firstIssue && TREND_PARAMS.includes(firstIssue) ? firstIssue : 'DO');
+  const [param, setParam] = useState<ParamKey>(firstIssue && TREND_PARAMS.includes(firstIssue) ? firstIssue : 'Vibrio');
   const [shownParam, setShownParam] = useState(param);
   const chartOpacity = useSharedValue(1);
 
@@ -193,13 +193,12 @@ function OwnerSections({ view, farm, start }: { view: PondView; farm: FarmView; 
 
   const series = paramHistory(farm, view.pond.id, shownParam).map((h) => ({ label: wibDay(h.at).split(',')[0], value: h.value }));
   const values = series.map((s) => s.value);
-  const labs = farm.labResults.filter((l) => l.pondId === null || l.pondId === view.pond.id);
   const history = farm.readings.filter((r) => r.pondId === view.pond.id).slice(-6).reverse();
 
   return (
     <>
       <FadeSlideIn index={start}>
-        <Text style={styles.section}>Kadar zat & parameter</Text>
+        <Text style={styles.section}>Bakteri, plankton & patogen</Text>
         <Segmented items={GROUPS} value={group} onChange={setGroup} tone="light" />
         <View style={[card, { marginTop: 12 }]}>
           <ParamTable keys={PARAM_ORDER.filter((k) => PARAMS[k].group === group)} latest={view.latest} />
@@ -209,7 +208,7 @@ function OwnerSections({ view, farm, start }: { view: PondView; farm: FarmView; 
       <FadeSlideIn index={start + 1}>
         <View style={card}>
           <Text style={styles.chartTitle}>TREN {PARAMS[shownParam].label.toUpperCase()}</Text>
-          <Text style={styles.chartNote}>Dari pengecekan manual · batas aman {safeRange(shownParam)}{PARAMS[shownParam].unit ? ` ${PARAMS[shownParam].unit}` : ''}</Text>
+          <Text style={styles.chartNote}>Dari input mandiri · {limitText(shownParam).replace(/^./, (ch) => ch.toLowerCase())}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendChips}>
             {TREND_PARAMS.map((k) => <Chip key={k} label={shortName(k)} active={k === param} onPress={() => setParam(k)} />)}
           </ScrollView>
@@ -227,21 +226,6 @@ function OwnerSections({ view, farm, start }: { view: PondView; farm: FarmView; 
       </FadeSlideIn>
 
       <FadeSlideIn index={start + 2}>
-        <View style={card}>
-          <Text style={styles.cardTitle}>{farm.labTitle}</Text>
-          {labs.map((l) => (
-            <View key={`${l.marker}-${l.pondId}`} style={styles.kitRow}>
-              {l.detected
-                ? <TriangleAlert size={16} color={colors.amber} strokeWidth={2.6} />
-                : <FlaskConical size={16} color={colors.green} strokeWidth={2.4} />}
-              <Text style={styles.labMarker}>{l.marker}</Text>
-              <Text style={[styles.kitText, { textAlign: 'right' }, l.detected && { color: colors.red }]}>{l.result}</Text>
-            </View>
-          ))}
-        </View>
-      </FadeSlideIn>
-
-      <FadeSlideIn index={start + 3}>
         <View style={card}>
           <Text style={styles.cardTitle}>Riwayat pengecekan</Text>
           {history.map((r) => (
@@ -288,15 +272,14 @@ const styles = StyleSheet.create({
   paramGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   param: { width: '47%', flexGrow: 1, gap: 6 },
   paramLabel: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.slate },
-  paramValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  paramValue: { fontFamily: fonts.monoBold, fontSize: 32, color: colors.ink, ...monoNums },
+  paramValueRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 },
+  paramValue: { fontFamily: fonts.monoBold, fontSize: 26, color: colors.ink, ...monoNums },
   paramUnit: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate },
   ctxRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   ctxText: { fontFamily: fonts.bodyBold, fontSize: 13 },
   okText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.green },
   kitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   kitText: { flex: 1, fontFamily: fonts.bodySemi, fontSize: 14, lineHeight: 20, color: colors.ink },
-  labMarker: { fontFamily: fonts.monoBold, fontSize: 14, color: colors.ink, width: 60 },
   chartTitle: { fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 0.8, color: colors.ink },
   chartNote: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.slate, marginTop: 4 },
   trendChips: { gap: 8, marginTop: 12, marginBottom: 8 },

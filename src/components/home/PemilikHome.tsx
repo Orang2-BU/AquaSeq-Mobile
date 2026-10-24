@@ -1,5 +1,5 @@
-// Beranda PEMILIK — ringkasan seluruh tambak yang lebih rinci: produksi, kadar zat rata-rata
-// semua kolam, kolam yang perlu perhatian beserta saran, dan pengecekan terakhir.
+// Beranda PEMILIK — ringkasan seluruh tambak yang lebih rinci: produksi, rata-rata bakteri &
+// plankton semua kolam, hasil qPCR, kolam yang perlu perhatian beserta saran, dan pengecekan terakhir.
 import { useRouter } from 'expo-router';
 import { ArrowRight, FlaskConical } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,11 +10,11 @@ import { MetricCard } from '../MetricCard';
 import { statusMeta } from '../StatusIconBadge';
 import { HomeHeader, PondMitigation, homeStyles } from './shared';
 import { biomassKg, paramStatus, wibDay, wibTime } from '@/lib/domain';
-import type { FarmView } from '@/lib/farm';
-import { PARAMS, fmtParam, safeRange, type ParamKey } from '@/lib/params';
+import { pathogenSummary, type FarmView } from '@/lib/farm';
+import { NUMERIC_PARAMS, PARAMS, fmtParam, limitText, shortName, type ParamKey } from '@/lib/params';
 import { card, colors, fonts, monoNums } from '@/lib/theme';
 
-const SUMMARY_PARAMS: ParamKey[] = ['DO', 'pH', 'Suhu', 'Salinitas', 'Amonia', 'Nitrit', 'Alkalinitas', 'TOM', 'Vibrio'];
+const SUMMARY_PARAMS: ParamKey[] = NUMERIC_PARAMS;
 
 export function PemilikHome({ farm }: { farm: FarmView }) {
   const router = useRouter();
@@ -25,7 +25,7 @@ export function PemilikHome({ farm }: { farm: FarmView }) {
   const avgSr = farm.ponds.reduce((s, v) => s + v.pond.srPercent, 0) / Math.max(farm.ponds.length, 1);
   const totalArea = farm.ponds.reduce((s, v) => s + v.pond.areaM2, 0);
   const recent = [...farm.readings].reverse().slice(0, 5);
-  const detected = farm.labResults.filter((l) => l.detected);
+  const positives = pathogenSummary(farm).filter((x) => x.positives.length);
 
   let i = 0;
   return (
@@ -65,19 +65,19 @@ export function PemilikHome({ farm }: { farm: FarmView }) {
       ) : null}
 
       <FadeSlideIn index={i++}>
-        <Text style={homeStyles.section}>Kadar zat semua kolam</Text>
+        <Text style={homeStyles.section}>Bakteri & plankton semua kolam</Text>
         <View style={card}>
           {SUMMARY_PARAMS.map((k, idx) => <AverageRow key={k} param={k} farm={farm} first={idx === 0} />)}
         </View>
       </FadeSlideIn>
 
       <FadeSlideIn index={i++}>
-        <Pressable onPress={() => router.navigate('/laporan')} accessibilityRole="button" accessibilityLabel="Buka laporan lab" style={[card, styles.lab]}>
+        <Pressable onPress={() => router.navigate('/laporan')} accessibilityRole="button" accessibilityLabel="Buka laporan qPCR" style={[card, styles.lab]}>
           <View style={styles.labIcon}><FlaskConical size={20} color={colors.navy} strokeWidth={2.4} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.labTitle}>{farm.labTitle}</Text>
             <Text style={styles.labSub}>
-              {detected.length ? detected.map((d) => `${d.marker}: ${d.result}`).join(' · ') : 'Tidak ada patogen terdeteksi'}
+              {positives.length ? positives.map((x) => `${shortName(x.key)} positif: ${x.positives.map((id) => `Kolam ${id}`).join(', ')}`).join(' · ') : 'Tidak ada patogen terdeteksi'}
             </Text>
           </View>
           <ArrowRight size={20} color={colors.navy} strokeWidth={2.4} />
@@ -117,7 +117,7 @@ function AverageRow({ param, farm, first }: { param: ParamKey; farm: FarmView; f
     <View style={[styles.avgRow, !first && styles.divider]}>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.avgLabel}>{c.label}</Text>
-        <Text style={styles.avgSub}>Batas {safeRange(param)}{c.unit ? ` ${c.unit}` : ''}</Text>
+        <Text style={styles.avgSub}>{limitText(param)}</Text>
         <View style={styles.avgStatus}>
           <Icon size={13} color={m.color} strokeWidth={2.6} />
           <Text style={[styles.avgStatusText, { color: m.color }]}>

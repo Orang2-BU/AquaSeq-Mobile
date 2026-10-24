@@ -1,4 +1,4 @@
-// Laporan PEMILIK (§8.6): skor risiko, hasil lab, dan rekomendasi yang bisa dijadwalkan
+// Laporan PEMILIK (§8.6): skor risiko, ringkasan qPCR, dan rekomendasi yang bisa dijadwalkan
 // menjadi tugas teknisi untuk besok.
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
@@ -11,7 +11,7 @@ import { GradientHeader } from '@/components/GradientHeader';
 import { RecCard } from '@/components/RecCard';
 import { useToast } from '@/components/Toast';
 import { tomorrowLabel, type RiskScore } from '@/lib/domain';
-import { useFarm } from '@/lib/farm';
+import { pathogenSummary, useFarm } from '@/lib/farm';
 import { useStore } from '@/lib/store';
 import { card, colors, fonts, gradients, monoNums } from '@/lib/theme';
 
@@ -100,17 +100,22 @@ export default function Laporan() {
         <FadeSlideIn index={i++}>
           <View style={card}>
             <Text style={styles.cardTitle}>{farm.labTitle}</Text>
-            {farm.labResults.map((l, idx) => (
-              <View key={`${l.marker}-${idx}`} style={[styles.labRow, idx > 0 && styles.divider]}>
-                <View style={[styles.labIcon, { backgroundColor: l.detected ? '#FFF1D1' : '#E2F5EC' }]}>
-                  {l.detected
-                    ? <TriangleAlert size={18} color={colors.amber} strokeWidth={2.6} />
-                    : <Check size={18} color={colors.green} strokeWidth={2.8} />}
+            {pathogenSummary(farm).map((x, idx) => {
+              const detected = x.positives.length > 0;
+              return (
+                <View key={x.key} style={[styles.labRow, idx > 0 && styles.divider]}>
+                  <View style={[styles.labIcon, { backgroundColor: detected ? '#FFF1D1' : '#E2F5EC' }]}>
+                    {detected
+                      ? <TriangleAlert size={18} color={colors.amber} strokeWidth={2.6} />
+                      : <Check size={18} color={colors.green} strokeWidth={2.8} />}
+                  </View>
+                  <Text style={styles.labMarker}>{x.key}</Text>
+                  <Text style={[styles.labResult, detected && { color: colors.red }]}>
+                    {!x.tested ? 'Belum diuji' : detected ? `Terdeteksi · ${x.positives.map((id) => `Kolam ${id}`).join(', ')}` : `Tidak terdeteksi · ${x.tested} kolam`}
+                  </Text>
                 </View>
-                <Text style={styles.labMarker}>{l.marker}</Text>
-                <Text style={[styles.labResult, l.detected && { color: colors.red }]}>{l.result}</Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </FadeSlideIn>
 

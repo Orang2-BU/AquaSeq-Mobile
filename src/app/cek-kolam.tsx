@@ -1,5 +1,5 @@
 // Cek Kolam (teknisi) — modal slide-up + fade backdrop (§6.2).
-// Alur: pilih kolam -> isi 4 nilai cepat (+ uji kit bila ada) -> Simpan -> status & saran mitigasi.
+// Alur: pilih kolam -> isi hitungan Vibrio & plankton (+ hitungan lain / qPCR bila ada) -> Simpan -> status & saran.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronDown, ChevronUp, CircleCheck, CloudOff, Minus, Plus, X } from 'lucide-react-native';
@@ -15,7 +15,7 @@ import { StatusIconBadge, statusMeta } from '@/components/StatusIconBadge';
 import { easeOut, motion } from '@/lib/animations';
 import { paramStatus, type Reading } from '@/lib/domain';
 import { useFarm, useMitigation } from '@/lib/farm';
-import { KIT_PARAMS, PARAMS, QUICK_PARAMS, type ParamKey } from '@/lib/params';
+import { EXTRA_PARAMS, PARAMS, PATHOGEN_PARAMS, QUICK_PARAMS, type ParamKey } from '@/lib/params';
 import { useMotionReduced, useStore } from '@/lib/store';
 import { colors, fonts, gradients, monoNums } from '@/lib/theme';
 
@@ -40,7 +40,8 @@ export default function CekKolam() {
   const [pondId, setPondId] = useState(params.pond && farm?.byId[params.pond] ? params.pond : ponds[0]?.pond.id ?? '');
   // Draf per kolam: berpindah kolam tidak menghapus angka yang sudah diisi.
   const [drafts, setDrafts] = useState<Record<string, Partial<Record<ParamKey, string>>>>({});
-  const [showKit, setShowKit] = useState(false);
+  const [showExtra, setShowExtra] = useState(false);
+  const [showPcr, setShowPcr] = useState(false);
   const [saved, setSaved] = useState<Reading | null>(null);
 
   const view = farm?.byId[pondId];
@@ -56,7 +57,7 @@ export default function CekKolam() {
   };
 
   const values: Reading['values'] = {};
-  for (const k of [...QUICK_PARAMS, ...(showKit ? KIT_PARAMS : [])]) {
+  for (const k of [...QUICK_PARAMS, ...(showExtra ? EXTRA_PARAMS : []), ...(showPcr ? PATHOGEN_PARAMS : [])]) {
     const v = parse(textOf(k));
     if (v !== null) values[k] = v;
   }
@@ -75,7 +76,8 @@ export default function CekKolam() {
     backdrop.set(withTiming(0, { duration: reduced ? motion.reduced : 250 }));
     if (reduced) sheetOpacity.set(withTiming(0, { duration: motion.reduced }));
     else sheetY.set(withTiming(height, { duration: 250, easing: easeOut }));
-    setTimeout(() => router.back(), reduced ? motion.reduced : 250);
+    // Dibuka langsung dari tautan (tanpa riwayat) -> kembali ke Beranda.
+    setTimeout(() => (router.canGoBack() ? router.back() : router.replace('/beranda')), reduced ? motion.reduced : 250);
   };
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdrop.get() }));
   const sheetStyle = useAnimatedStyle(() => ({ opacity: sheetOpacity.get(), transform: [{ translateY: sheetY.get() }] }));
@@ -133,20 +135,27 @@ export default function CekKolam() {
 
                 <View style={styles.group}>
                   <Text style={styles.groupTitle}>Cek cepat</Text>
-                  <Text style={styles.groupHint}>Terisi nilai terakhir — ubah sesuai hasil ukur sekarang.</Text>
+                  <Text style={styles.groupHint}>Hitung koloni TCBS & plankton. Terisi nilai terakhir — ubah sesuai hasil hitung sekarang.</Text>
                   {QUICK_PARAMS.map((k) => <ParamInput key={k} k={k} text={textOf(k)} onText={(t) => setText(k, t)} onStep={(d) => step(k, d)} />)}
                 </View>
 
-                <View style={styles.group}>
-                  <Pressable onPress={() => setShowKit((s) => !s)} accessibilityRole="button" accessibilityState={{ expanded: showKit }} style={styles.kitToggle}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.groupTitle}>Uji kit (opsional)</Text>
-                      <Text style={styles.groupHint}>Amonia, nitrit, alkalinitas, kecerahan — isi yang diukur saja.</Text>
-                    </View>
-                    {showKit ? <ChevronUp size={22} color={colors.navy} /> : <ChevronDown size={22} color={colors.navy} />}
-                  </Pressable>
-                  {showKit ? KIT_PARAMS.map((k) => <ParamInput key={k} k={k} text={textOf(k)} onText={(t) => setText(k, t)} onStep={(d) => step(k, d)} />) : null}
-                </View>
+                <Section
+                  title="Hitungan lain (opsional)"
+                  hint="Total bakteri, Bacillus, diatom, alga hijau, dinoflagellata — isi yang dihitung saja."
+                  open={showExtra}
+                  onToggle={() => setShowExtra((v) => !v)}
+                >
+                  {EXTRA_PARAMS.map((k) => <ParamInput key={k} k={k} text={textOf(k)} onText={(t) => setText(k, t)} onStep={(d) => step(k, d)} />)}
+                </Section>
+
+                <Section
+                  title="Hasil qPCR (opsional)"
+                  hint="Isi bila hasil lab sudah keluar. Kosongkan yang tidak diuji."
+                  open={showPcr}
+                  onToggle={() => setShowPcr((v) => !v)}
+                >
+                  {PATHOGEN_PARAMS.map((k) => <PcrInput key={k} k={k} text={textOf(k)} onText={(t) => setText(k, t)} />)}
+                </Section>
 
                 <PressScale onPress={save} disabled={!quickComplete} accessibilityRole="button" accessibilityLabel="Simpan dan lihat saran" style={[styles.saveBtn, !quickComplete && { opacity: 0.45 }]}>
                   <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.saveInner}>
@@ -158,6 +167,41 @@ export default function CekKolam() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Animated.View>
+    </View>
+  );
+}
+
+function Section({ title, hint, open, onToggle, children }: {
+  title: string; hint: string; open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.group}>
+      <Pressable onPress={onToggle} accessibilityRole="button" accessibilityState={{ expanded: open }} style={styles.kitToggle}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.groupTitle}>{title}</Text>
+          <Text style={styles.groupHint}>{hint}</Text>
+        </View>
+        {open ? <ChevronUp size={22} color={colors.navy} /> : <ChevronDown size={22} color={colors.navy} />}
+      </Pressable>
+      {open ? children : null}
+    </View>
+  );
+}
+
+/** Hasil qPCR: pilih Negatif / Positif. Tidak dipilih = tidak diuji. */
+function PcrInput({ k, text, onText }: { k: ParamKey; text: string; onText: (t: string) => void }) {
+  const c = PARAMS[k];
+  const v = parse(text);
+  const st = v === null ? null : paramStatus(k, v);
+  const m = st ? statusMeta[st] : null;
+  return (
+    <View style={styles.row}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowLabel}>{c.label}</Text>
+        <Text style={[styles.rowUnit, m && st !== 'SEHAT' ? { color: m.color } : null]}>{v === null ? 'Belum diisi' : v > 0.5 ? 'Terdeteksi' : 'Tidak terdeteksi'}</Text>
+      </View>
+      <Chip label="Negatif" active={v === 0} onPress={() => onText(v === 0 ? '' : '0')} />
+      <Chip label="Positif" active={v === 1} onPress={() => onText(v === 1 ? '' : '1')} />
     </View>
   );
 }
@@ -228,7 +272,7 @@ function Result({ reading, pendingIds, morningTaskOpen, onDoneTask, onAnother, o
       {mitigation ? <MitigationCard mitigation={mitigation} ai={ai} title="Saran mitigasi" /> : null}
       {morningTaskOpen ? (
         <PressScale onPress={onDoneTask} accessibilityRole="button" style={styles.ghostBtn}>
-          <Text style={styles.ghostText}>Tandai tugas “Cek kualitas air pagi” selesai</Text>
+          <Text style={styles.ghostText}>Tandai tugas “Hitung Vibrio & plankton pagi” selesai</Text>
         </PressScale>
       ) : null}
       <View style={styles.resultBtns}>
@@ -272,8 +316,8 @@ const styles = StyleSheet.create({
   rowUnit: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.slate },
   stepBtn: { width: 44, height: 48, borderRadius: 14, backgroundColor: '#E6EEFF', alignItems: 'center', justifyContent: 'center' },
   valueInput: {
-    width: 82, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, backgroundColor: '#F7FAFF',
-    textAlign: 'center', fontFamily: fonts.monoBold, fontSize: 20, color: colors.ink, ...monoNums,
+    width: 104, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, backgroundColor: '#F7FAFF',
+    textAlign: 'center', fontFamily: fonts.monoBold, fontSize: 18, color: colors.ink, ...monoNums,
   },
   saveBtn: { borderRadius: 18, overflow: 'hidden' },
   saveInner: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
