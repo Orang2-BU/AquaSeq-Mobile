@@ -1,4 +1,4 @@
-// Laporan PEMILIK (§8.6): skor risiko, hasil lab, dan rekomendasi yang bisa dijadwalkan
+// Laporan PEMILIK (§8.6): skor risiko dan rekomendasi yang bisa dijadwalkan
 // menjadi tugas teknisi untuk besok.
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
@@ -46,7 +46,7 @@ export default function Laporan() {
   let i = 0;
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <GradientHeader title="Laporan" subtitle={`${farm.labTitle} · ${farm.farm.name}`} />
+      <GradientHeader title="Laporan" subtitle={`Skor risiko minggu ini · ${farm.farm.name}`} />
       <View style={styles.body}>
         {top ? (
           <FadeSlideIn index={i++}>
@@ -97,23 +97,6 @@ export default function Laporan() {
           );
         })}
 
-        <FadeSlideIn index={i++}>
-          <View style={card}>
-            <Text style={styles.cardTitle}>{farm.labTitle}</Text>
-            {farm.labResults.map((l, idx) => (
-              <View key={`${l.marker}-${idx}`} style={[styles.labRow, idx > 0 && styles.divider]}>
-                <View style={[styles.labIcon, { backgroundColor: l.detected ? '#FFF1D1' : '#E2F5EC' }]}>
-                  {l.detected
-                    ? <TriangleAlert size={18} color={colors.amber} strokeWidth={2.6} />
-                    : <Check size={18} color={colors.green} strokeWidth={2.8} />}
-                </View>
-                <Text style={styles.labMarker}>{l.marker}</Text>
-                <Text style={[styles.labResult, l.detected && { color: colors.red }]}>{l.result}</Text>
-              </View>
-            ))}
-          </View>
-        </FadeSlideIn>
-
         <Text style={styles.section}>Rekomendasi untuk teknisi</Text>
         <Text style={styles.sectionSub}>Jadwalkan supaya muncul di daftar tugas teknisi besok.</Text>
         {farm.recommendations.map((r) => (
@@ -153,10 +136,4 @@ const styles = StyleSheet.create({
   scoreNum: { fontFamily: fonts.monoBold, fontSize: 32, lineHeight: 36, color: colors.ink, ...monoNums },
   riskRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   riskText: { fontFamily: fonts.bodyBold, fontSize: 13 },
-  cardTitle: { fontFamily: fonts.display, fontSize: 17, color: colors.ink, marginBottom: 6 },
-  labRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  divider: { borderTopWidth: 1, borderTopColor: colors.border },
-  labIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  labMarker: { fontFamily: fonts.monoBold, fontSize: 15, color: colors.ink, width: 64 },
-  labResult: { flex: 1, fontFamily: fonts.bodySemi, fontSize: 14, lineHeight: 20, color: colors.ink, textAlign: 'right' },
 });

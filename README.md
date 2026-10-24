@@ -2,12 +2,14 @@
 
 Aplikasi React Native (Expo SDK 58, Expo Router) untuk dua peran:
 
-- **Teknisi tambak** — mengecek kondisi kolam secara manual (DO, pH, suhu, salinitas + uji kit),
+- **Teknisi tambak** — mengamati kolam dengan mata (warna air, lapisan alga, udang menyala di malam hari,
+  kotoran putih, ekor merah, insang hitam, lumut di tubuh udang) cukup dengan mengetuk pilihan, lalu
   langsung mendapat status kolam dan **saran mitigasi cepat** (AI bila online, aturan bawaan bila offline).
-- **Pemilik tambak** — melihat kondisi semua kolam lebih rinci: kadar zat (amonia, nitrit, alkalinitas,
-  TOM, H₂S, Vibrio, …), tren, biomassa, hasil lab, skor risiko, dan menjadwalkan rekomendasi untuk teknisi.
+- **Pemilik tambak** — melihat kondisi semua kolam lebih rinci: pengamatan tiap kolam, riwayat 7 hari,
+  biomassa, skor risiko, dan menjadwalkan rekomendasi untuk teknisi.
 
-Tidak ada fitur sensor/IoT: semua data berasal dari pengecekan manual dan hasil lab.
+Tidak ada sensor/IoT, alat ukur, atau uji lab: semua data adalah pengamatan mata telanjang yang
+berpengaruh langsung ke udang.
 
 ## Menjalankan
 

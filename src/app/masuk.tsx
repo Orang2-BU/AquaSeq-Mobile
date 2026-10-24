@@ -15,7 +15,7 @@ import { card, colors, fonts, gradients } from '@/lib/theme';
 
 const ROLES: { key: Role; title: string; desc: string; icon: LucideIcon }[] = [
   { key: 'teknisi', title: 'Teknisi tambak', desc: 'Cek kondisi kolam dan ikuti saran mitigasi cepat', icon: Stethoscope },
-  { key: 'pemilik', title: 'Pemilik tambak', desc: 'Lihat kondisi lengkap, kadar zat, dan laporan semua kolam', icon: Building2 },
+  { key: 'pemilik', title: 'Pemilik tambak', desc: 'Lihat kondisi air dan udang semua kolam, plus laporan', icon: Building2 },
 ];
 
 export default function Masuk() {

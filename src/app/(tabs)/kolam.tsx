@@ -1,4 +1,4 @@
-// Daftar kolam (§8.2). Status dihitung dari pengecekan manual terakhir; urut kritis -> waspada -> sehat.
+// Daftar kolam (§8.2). Status dihitung dari pengamatan terakhir; urut kritis -> waspada -> sehat.
 import { useRouter } from 'expo-router';
 import { Check, CircleX, Search, TriangleAlert, Waves } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
