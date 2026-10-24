@@ -1,113 +1,79 @@
-// Parameter MIKROBA kolam yang diinput mandiri oleh teknisi / lab (hitung koloni TCBS & TPC,
-// hitung plankton di mikroskop, hasil qPCR). Tidak ada parameter sensor (pH, DO, suhu, dll.).
-// Batas di sini adalah nilai awal — sesuaikan dengan SOP tambak atau kirim dari backend.
+// Pengamatan VISUAL teknisi: tanda bakteri & plankton yang terlihat mata telanjang dan langsung
+// berpengaruh ke udang. Tanpa alat ukur, tanpa sensor, tanpa lab.
+// Setiap pengamatan disimpan sebagai kode pilihan (angka) — lihat `options`.
+import type { PondStatus } from './domain';
 
 export type ParamKey =
-  | 'Vibrio' | 'VibrioHijau' | 'TotalBakteri' | 'Bacillus'
-  | 'Plankton' | 'Diatom' | 'AlgaHijau' | 'BGA' | 'Dino'
-  | 'WSSV' | 'AHPND' | 'EHP' | 'IHHNV';
+  | 'WarnaAir' | 'LapisanAlga'
+  | 'UdangMenyala' | 'KotoranPutih' | 'EkorMerah' | 'InsangHitam' | 'LumutTubuh';
 
-export type ParamGroup = 'Bakteri' | 'Plankton' | 'Patogen';
+export type ParamGroup = 'Air' | 'Udang';
 
-/** Batas: di luar `warn` = WASPADA, di luar `crit` = KRITIS. */
-export type Limits = {
-  warn: { min?: number; max?: number };
-  crit: { min?: number; max?: number };
-};
+export type ParamOption = { value: number; label: string; status: PondStatus; note?: string };
 
 export type ParamConfig = {
   key: ParamKey;
   label: string;
   short: string;
-  unit: string;
-  /** 'number' = hitungan; 'binary' = hasil qPCR (0 = negatif, 1 = positif). */
-  kind: 'number' | 'binary';
-  decimals: number;
-  step: number;
-  min: number;
-  max: number;
   group: ParamGroup;
-  /** Diisi teknisi di "Cek cepat". Sisanya di bagian opsional. */
-  quick: boolean;
-  limits: Limits;
+  /** Cara mengamati, ditampilkan di bawah nama pengamatan. */
+  hint: string;
+  options: ParamOption[];
 };
 
-const p = (c: ParamConfig) => c;
-const binary = (key: ParamKey, label: string, severe: boolean): ParamConfig => ({
-  key, label, short: key, unit: '', kind: 'binary', decimals: 0, step: 1, min: 0, max: 1, group: 'Patogen', quick: false,
-  // Positif = di atas 0,5. WSSV & AHPND langsung kritis; EHP & IHHNV waspada.
-  limits: severe ? { warn: { max: 0.5 }, crit: { max: 0.5 } } : { warn: { max: 0.5 }, crit: {} },
-});
+const LEVELS: ParamOption[] = [
+  { value: 0, label: 'Tidak ada', status: 'SEHAT' },
+  { value: 1, label: 'Sedikit', status: 'WASPADA', note: 'beberapa ekor / sebagian kecil kolam' },
+  { value: 2, label: 'Banyak', status: 'KRITIS', note: 'banyak udang / sebagian besar kolam' },
+];
+
+const level = (key: ParamKey, label: string, short: string, group: ParamGroup, hint: string): ParamConfig =>
+  ({ key, label, short, group, hint, options: LEVELS });
 
 export const PARAMS: Record<ParamKey, ParamConfig> = {
-  Vibrio: p({ key: 'Vibrio', label: 'Total Vibrio (TCBS)', short: 'Vibrio', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 100, min: 0, max: 10_000_000, group: 'Bakteri', quick: true,
-    limits: { warn: { max: 1_000 }, crit: { max: 10_000 } } }),
-  VibrioHijau: p({ key: 'VibrioHijau', label: 'Vibrio koloni hijau', short: 'Vibrio hijau', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 10, min: 0, max: 1_000_000, group: 'Bakteri', quick: true,
-    limits: { warn: { max: 100 }, crit: { max: 1_000 } } }),
-  TotalBakteri: p({ key: 'TotalBakteri', label: 'Total bakteri (TPC)', short: 'Total bakteri', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 10_000, min: 0, max: 100_000_000, group: 'Bakteri', quick: false,
-    limits: { warn: { max: 1_000_000 }, crit: { max: 10_000_000 } } }),
-  Bacillus: p({ key: 'Bacillus', label: 'Probiotik Bacillus', short: 'Bacillus', unit: 'CFU/mL', kind: 'number', decimals: 0, step: 1_000, min: 0, max: 100_000_000, group: 'Bakteri', quick: false,
-    limits: { warn: { min: 10_000 }, crit: { min: 1_000 } } }),
-  Plankton: p({ key: 'Plankton', label: 'Total plankton', short: 'Plankton', unit: 'sel/mL', kind: 'number', decimals: 0, step: 5_000, min: 0, max: 10_000_000, group: 'Plankton', quick: true,
-    limits: { warn: { min: 50_000, max: 1_000_000 }, crit: { min: 10_000, max: 3_000_000 } } }),
-  Diatom: p({ key: 'Diatom', label: 'Diatom', short: 'Diatom', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: false,
-    limits: { warn: { min: 20 }, crit: { min: 10 } } }),
-  AlgaHijau: p({ key: 'AlgaHijau', label: 'Alga hijau (Chlorophyta)', short: 'Alga hijau', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: false,
-    limits: { warn: {}, crit: {} } }),
-  BGA: p({ key: 'BGA', label: 'Alga biru-hijau (BGA)', short: 'Alga biru-hijau', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: true,
-    limits: { warn: { max: 20 }, crit: { max: 40 } } }),
-  Dino: p({ key: 'Dino', label: 'Dinoflagellata', short: 'Dinoflagellata', unit: '%', kind: 'number', decimals: 0, step: 1, min: 0, max: 100, group: 'Plankton', quick: false,
-    limits: { warn: { max: 10 }, crit: { max: 20 } } }),
-  WSSV: binary('WSSV', 'WSSV (bintik putih)', true),
-  AHPND: binary('AHPND', 'AHPND / EMS', true),
-  EHP: binary('EHP', 'EHP (mikrosporidia)', false),
-  IHHNV: binary('IHHNV', 'IHHNV', false),
+  WarnaAir: {
+    key: 'WarnaAir', label: 'Warna air', short: 'Warna air', group: 'Air',
+    hint: 'Lihat dari pinggir kolam saat siang. Warna air = jenis plankton yang dominan.',
+    options: [
+      { value: 0, label: 'Hijau cerah', status: 'SEHAT', note: 'alga hijau, baik untuk udang' },
+      { value: 1, label: 'Coklat muda', status: 'SEHAT', note: 'diatom, pakan alami udang' },
+      { value: 2, label: 'Bening', status: 'WASPADA', note: 'plankton terlalu sedikit' },
+      { value: 3, label: 'Hijau pekat / kebiruan', status: 'WASPADA', note: 'alga biru-hijau berlebih' },
+      { value: 4, label: 'Putih susu / keruh', status: 'WASPADA', note: 'bakteri berlebih' },
+      { value: 5, label: 'Merah kecoklatan', status: 'KRITIS', note: 'alga merah (dinoflagellata)' },
+    ],
+  },
+  LapisanAlga: level('LapisanAlga', 'Lapisan alga di permukaan', 'Lapisan alga', 'Air',
+    'Lapisan hijau kebiruan seperti cat, biasanya menumpuk di sudut kolam searah angin.'),
+  UdangMenyala: level('UdangMenyala', 'Udang menyala di malam hari', 'Udang menyala', 'Udang',
+    'Senter kolam saat malam. Udang yang berpendar terkena bakteri Vibrio berpendar.'),
+  KotoranPutih: level('KotoranPutih', 'Kotoran putih', 'Kotoran putih', 'Udang',
+    'Kotoran putih mengambang di permukaan atau menempel di anco.'),
+  EkorMerah: level('EkorMerah', 'Ekor & kaki memerah', 'Ekor merah', 'Udang',
+    'Angkat anco, lihat ekor dan kaki renang udang.'),
+  InsangHitam: level('InsangHitam', 'Insang hitam / kuning', 'Insang hitam', 'Udang',
+    'Lihat bagian kepala udang dari samping; insang sehat berwarna bening.'),
+  LumutTubuh: level('LumutTubuh', 'Lumut / lendir di tubuh udang', 'Lumut di tubuh', 'Udang',
+    'Tubuh udang tampak berbulu halus, berlumut, atau berlendir.'),
 };
 
 export const PARAM_ORDER: ParamKey[] = [
-  'Vibrio', 'VibrioHijau', 'TotalBakteri', 'Bacillus',
-  'Plankton', 'Diatom', 'AlgaHijau', 'BGA', 'Dino',
-  'WSSV', 'AHPND', 'EHP', 'IHHNV',
+  'WarnaAir', 'LapisanAlga',
+  'UdangMenyala', 'KotoranPutih', 'EkorMerah', 'InsangHitam', 'LumutTubuh',
 ];
 
-export const QUICK_PARAMS = PARAM_ORDER.filter((k) => PARAMS[k].quick);
-/** Opsional di Cek Kolam: hitungan tambahan (bukan cek cepat, bukan qPCR). */
-export const EXTRA_PARAMS = PARAM_ORDER.filter((k) => !PARAMS[k].quick && PARAMS[k].kind === 'number');
-export const PATHOGEN_PARAMS = PARAM_ORDER.filter((k) => PARAMS[k].kind === 'binary');
-/** Parameter angka yang bisa digambar trennya. */
-export const NUMERIC_PARAMS = PARAM_ORDER.filter((k) => PARAMS[k].kind === 'number');
+/** Pengamatan dengan pilihan Tidak ada / Sedikit / Banyak. */
+export const LEVEL_PARAMS = PARAM_ORDER.filter((k) => PARAMS[k].options === LEVELS);
 
-/** Nama pendek untuk kalimat & chip, mis. "Vibrio hijau". */
 export function shortName(key: ParamKey): string {
   return PARAMS[key].short;
 }
 
-export function fmtParam(key: ParamKey, value: number, withUnit = true): string {
-  const c = PARAMS[key];
-  if (c.kind === 'binary') return value > 0.5 ? 'Positif' : 'Negatif';
-  const n = value.toLocaleString('id-ID', { minimumFractionDigits: c.decimals, maximumFractionDigits: c.decimals });
-  if (!withUnit || !c.unit) return n;
-  return c.unit === '%' ? `${n}%` : `${n} ${c.unit}`;
+export function optionOf(key: ParamKey, value: number): ParamOption | undefined {
+  return PARAMS[key].options.find((o) => o.value === value);
 }
 
-/** Teks batas aman singkat, mis. "≤ 1.000" atau "50.000–1.000.000". */
-export function safeRange(key: ParamKey): string {
-  const c = PARAMS[key];
-  if (c.kind === 'binary') return 'Negatif';
-  const { warn } = c.limits;
-  const f = (v: number) => fmtParam(key, v, false);
-  if (warn.min !== undefined && warn.max !== undefined) return `${f(warn.min)}–${f(warn.max)}`;
-  if (warn.min !== undefined) return `≥ ${f(warn.min)}`;
-  if (warn.max !== undefined) return `≤ ${f(warn.max)}`;
-  return 'tidak dibatasi';
-}
-
-/** Kalimat batas lengkap untuk tabel & grafik, mis. "Batas aman ≤ 1.000 CFU/mL". */
-export function limitText(key: ParamKey): string {
-  const c = PARAMS[key];
-  if (c.kind === 'binary') return 'Aman bila negatif';
-  const { warn } = c.limits;
-  if (warn.min === undefined && warn.max === undefined) return 'Komposisi, tanpa batas';
-  const unit = !c.unit ? '' : c.unit === '%' ? '%' : ` ${c.unit}`;
-  return `Batas aman ${safeRange(key)}${unit}`;
+/** Label pilihan, mis. "Banyak" / "Hijau pekat / kebiruan". */
+export function fmtParam(key: ParamKey, value: number): string {
+  return optionOf(key, value)?.label ?? '—';
 }

@@ -32,7 +32,7 @@ export function PondCard({ view, detailed, onOpen }: { view: PondView; detailed:
       <View style={[styles.issue, { backgroundColor: issues.length ? m.tint : '#E2F5EC' }]}>
         <IssueIcon size={16} color={issues.length ? m.color : colors.green} strokeWidth={2.6} />
         <Text style={styles.issueText}>
-          {issues.length ? describeIssue(issues[0]) : 'Semua parameter dalam batas aman'}
+          {issues.length ? describeIssue(issues[0]) : 'Tidak ada tanda bermasalah'}
           {issues.length > 1 ? ` (+${issues.length - 1} lainnya)` : ''}
         </Text>
       </View>

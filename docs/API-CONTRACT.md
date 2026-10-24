@@ -3,7 +3,7 @@
 Dokumen ini untuk anggota tim yang membuat **backend** dan **endpoint saran AI**.
 Aplikasi sudah memanggil endpoint di bawah persis seperti tertulis. Kalau backend memakai bentuk
 lain, cukup sesuaikan satu file: `src/lib/api.ts` (semua panggilan jaringan ada di sana).
-Tipe TypeScript lengkap ada di `src/lib/domain.ts`.
+Tipe TypeScript lengkap ada di `src/lib/domain.ts`, daftar pengamatan di `src/lib/params.ts`.
 
 - Basis URL diatur lewat `EXPO_PUBLIC_API_URL` (lihat `.env.example`). Kosong = **mode demo**
   (data contoh `src/lib/seed.ts`, tidak ada request jaringan).
@@ -11,9 +11,9 @@ Tipe TypeScript lengkap ada di `src/lib/domain.ts`.
 - Setelah login, setiap request membawa `Authorization: Bearer <token>`.
 - Waktu dalam ISO 8601 dengan zona, mis. `2026-10-24T06:42:00+07:00`. Aplikasi menampilkan WIB.
 - Versi **web** memanggil API dari browser → backend wajib mengizinkan **CORS** untuk domain web
-  (mis. `https://tambak.expo.app`) dan header `Authorization`, `Content-Type`.
-- Tidak ada data sensor/IoT (tidak ada pH, DO, suhu, dll.). Data kolam adalah **mikroba** yang
-  diinput mandiri: hitung koloni bakteri (TCBS/TPC), hitung plankton di mikroskop, dan hasil qPCR lab.
+  (mis. `https://aquaseq.expo.app`) dan header `Authorization`, `Content-Type`.
+- Tidak ada sensor/IoT, alat ukur, atau lab. Data kolam adalah **pengamatan mata telanjang** teknisi:
+  warna air, lapisan alga, dan tanda bakteri yang terlihat pada udang.
 
 ---
 
@@ -51,67 +51,57 @@ Dipanggil setelah login dan dari tombol "Muat data". Response `200` = `FarmSnaps
   "readings": [
     { "id": "r-123", "pondId": "A3", "at": "2026-10-24T06:42:00+07:00", "by": "Shift pagi",
       "synced": true,
-      "values": { "Vibrio": 15000, "VibrioHijau": 1200, "Plankton": 150000, "BGA": 8 } },
-    { "id": "r-124", "pondId": "A3", "at": "2026-10-23T14:00:00+07:00", "by": "Mikroskop sore",
+      "values": { "WarnaAir": 0, "LapisanAlga": 0, "KotoranPutih": 1, "EkorMerah": 0, "InsangHitam": 0, "LumutTubuh": 0 } },
+    { "id": "r-124", "pondId": "A3", "at": "2026-10-23T20:00:00+07:00", "by": "Shift malam",
       "synced": true,
-      "values": { "TotalBakteri": 650000, "Bacillus": 18000, "Diatom": 45, "AlgaHijau": 35, "Dino": 3 } },
-    { "id": "r-125", "pondId": "D2", "at": "2026-10-23T10:00:00+07:00", "by": "Lab qPCR",
-      "synced": true,
-      "values": { "WSSV": 0, "AHPND": 0, "EHP": 1, "IHHNV": 0 } }
-  ],
-  "labTitle": "Hasil Lab qPCR · DOC 42",
-  "labResults": [
-    { "pondId": null, "marker": "WSSV", "result": "Tidak terdeteksi", "detected": false },
-    { "pondId": "B2", "marker": "Vibrio", "result": "Terdeteksi tinggi · Kolam B2", "detected": true }
+      "values": { "UdangMenyala": 2 } }
   ],
   "riskScores": [
-    { "pondId": "A3", "score": 82, "label": "Tinggi", "context": "Vibrio 15.000 CFU/mL · naik 4 hari berturut-turut" }
+    { "pondId": "A3", "score": 82, "label": "Tinggi", "context": "Udang menyala banyak 2 malam berturut-turut · ada kotoran putih" }
   ],
   "recommendations": [
-    { "id": "r1", "icon": "wind", "text": "Nyalakan kincir tambahan di Kolam A3 malam ini ..." }
+    { "id": "r1", "icon": "wheat", "text": "Kurangi pakan Kolam A3 30% dan tebar probiotik malam ini ..." }
   ],
   "tasks": [
-    { "id": "t1", "title": "Hitung Vibrio & plankton pagi semua kolam", "time": "06.30 WIB", "note": "Semua kolam", "done": false }
+    { "id": "t1", "title": "Cek warna air & anco pagi semua kolam", "time": "06.30 WIB", "note": "Semua kolam", "done": false }
   ],
   "feedTodayKg": 128
 }
 ```
 
 Catatan:
-- `readings` = **riwayat** pengecekan (cukup 7–14 hari terakhir per kolam). Aplikasi mengambil nilai
-  terbaru per parameter, menghitung status kolam, dan menggambar grafik tren dari sini.
-- Kunci `values` (boleh sebagian saja per pengecekan):
+- `readings` = **riwayat** pengamatan (cukup 7–14 hari terakhir per kolam). Satu pengamatan boleh
+  berisi sebagian saja (mis. cek malam hanya `UdangMenyala`). Aplikasi mengambil pilihan terbaru
+  per pengamatan, menghitung status kolam, dan menggambar riwayat 7 hari dari sini.
+- Isi `values` adalah **kode pilihan** (angka):
 
-  | Kelompok | Kunci | Arti | Satuan |
-  |---|---|---|---|
-  | Bakteri | `Vibrio` | Total Vibrio (agar TCBS) | CFU/mL |
-  | Bakteri | `VibrioHijau` | Vibrio koloni hijau | CFU/mL |
-  | Bakteri | `TotalBakteri` | Total bakteri (TPC) | CFU/mL |
-  | Bakteri | `Bacillus` | Probiotik Bacillus | CFU/mL |
-  | Plankton | `Plankton` | Total plankton | sel/mL |
-  | Plankton | `Diatom` | Diatom | % dari total plankton |
-  | Plankton | `AlgaHijau` | Alga hijau (Chlorophyta) | % |
-  | Plankton | `BGA` | Alga biru-hijau (Cyanobacteria) | % |
-  | Plankton | `Dino` | Dinoflagellata | % |
-  | Patogen | `WSSV`, `AHPND`, `EHP`, `IHHNV` | Hasil qPCR | `0` = negatif, `1` = positif |
+  | Kunci | Pengamatan | Kode → arti (status) |
+  |---|---|---|
+  | `WarnaAir` | Warna air | `0` hijau cerah (sehat) · `1` coklat muda (sehat) · `2` bening (waspada) · `3` hijau pekat / kebiruan (waspada) · `4` putih susu / keruh (waspada) · `5` merah kecoklatan (kritis) |
+  | `LapisanAlga` | Lapisan alga di permukaan | tingkat* |
+  | `UdangMenyala` | Udang menyala di malam hari (Vibrio berpendar) | tingkat* |
+  | `KotoranPutih` | Kotoran putih mengambang / di anco | tingkat* |
+  | `EkorMerah` | Ekor & kaki udang memerah | tingkat* |
+  | `InsangHitam` | Insang udang hitam / kuning | tingkat* |
+  | `LumutTubuh` | Lumut / lendir di tubuh udang | tingkat* |
 
-  Hasil qPCR **tidak** dikirim terpisah — cukup sebagai pengecekan biasa dengan `by: "Lab qPCR"`.
-  Aplikasi merangkum hasil qPCR seluruh tambak dari nilai terbaru tiap kolam.
+  \*Tingkat: `0` tidak ada (sehat) · `1` sedikit (waspada) · `2` banyak (kritis).
 
-- Batas aman (untuk status Sehat/Waspada/Kritis) saat ini ada di aplikasi: `src/lib/params.ts`.
-  Kalau batas perlu diatur per tambak dari server, tambahkan field di `FarmSnapshot` dan beri tahu
-  tim mobile.
-- `recommendations[].icon`: `"wind" | "wheat" | "flask" | "droplet" | "shovel" | "microscope"`.
+- Status per pilihan saat ini diatur di aplikasi (`src/lib/params.ts`). Kalau perlu diatur per
+  tambak dari server, tambahkan field di `FarmSnapshot` dan beri tahu tim mobile.
+- `recommendations[].icon`: `"wheat" | "flask" | "droplet" | "shovel" | "eye"`.
 
-## 3. Kirim pengecekan — `POST /readings`
+## 3. Kirim pengamatan — `POST /readings`
 
-Dikirim oleh teknisi setelah "Simpan" di layar Cek Kolam. **Offline-first**: kalau gagal/offline,
-data tetap di antrean HP dan dikirim ulang otomatis saat online (atau lewat "Sinkronkan sekarang").
+Dikirim oleh teknisi setelah "Simpan" di layar Cek Kolam (semua 7 pengamatan diisi).
+**Offline-first**: kalau gagal/offline, data tetap di antrean HP dan dikirim ulang otomatis saat
+online (atau lewat "Sinkronkan sekarang").
 
 Request:
 ```json
 { "id": "local-1761269520000", "pondId": "A3", "at": "2026-10-24T08:12:00.000Z",
-  "by": "Budi Santoso", "values": { "Vibrio": 9000, "VibrioHijau": 700, "Plankton": 160000, "BGA": 9 } }
+  "by": "Budi Santoso",
+  "values": { "WarnaAir": 0, "LapisanAlga": 0, "UdangMenyala": 1, "KotoranPutih": 0, "EkorMerah": 0, "InsangHitam": 0, "LumutTubuh": 0 } }
 ```
 Response `201`/`204`. **Wajib idempoten berdasarkan `id`** — aplikasi bisa mengirim ulang data yang
 sama setelah koneksi putus; jangan simpan dobel.
@@ -148,27 +138,27 @@ Request:
   "pond": { "id": "A3", "name": "Kolam A3", "blok": "A", "docDays": 42, "srPercent": 81,
             "areaM2": 2500, "stockedCount": 250000, "abwGram": 6.2 },
   "reading": { "at": "2026-10-24T06:42:00+07:00",
-               "values": { "Vibrio": 15000, "VibrioHijau": 1200, "Plankton": 150000, "BGA": 8, "Bacillus": 18000, "EHP": 0 } },
-  "history": [ { "at": "2026-10-23T06:30:00+07:00", "values": { "Vibrio": 11500, "VibrioHijau": 880 } } ],
+               "values": { "WarnaAir": 0, "LapisanAlga": 0, "UdangMenyala": 2, "KotoranPutih": 1, "EkorMerah": 0, "InsangHitam": 0, "LumutTubuh": 0 } },
+  "history": [ { "at": "2026-10-22T20:00:00+07:00", "values": { "UdangMenyala": 2 } } ],
   "issues": [
-    { "param": "Vibrio", "value": 15000, "severity": "KRITIS", "direction": "tinggi", "limit": 1000 },
-    { "param": "VibrioHijau", "value": 1200, "severity": "KRITIS", "direction": "tinggi", "limit": 100 }
+    { "param": "UdangMenyala", "value": 2, "severity": "KRITIS" },
+    { "param": "KotoranPutih", "value": 1, "severity": "WASPADA" }
   ]
 }
 ```
-- `reading.values` = nilai **terbaru per parameter** (gabungan beberapa pengecekan).
-- `history` = 10 pengecekan terakhir kolam itu (lama → baru).
-- `issues` = parameter di luar batas menurut aplikasi, paling parah dulu.
+- `reading.values` = pilihan **terbaru per pengamatan** (gabungan beberapa pengamatan).
+- `history` = 10 pengamatan terakhir kolam itu (lama → baru).
+- `issues` = pengamatan yang tidak sehat menurut aplikasi, paling parah dulu. Arti kode ada di tabel §2.
 
 Response `200`:
 ```json
 {
   "severity": "KRITIS",
-  "summary": "Kolam A3 kritis: Vibrio 15.000 CFU/mL dan naik 4 hari berturut-turut.",
+  "summary": "Kolam A3 kritis: udang menyala banyak 2 malam berturut-turut dan mulai ada kotoran putih.",
   "steps": [
-    { "title": "Kurangi pakan Kolam A3 20–30%", "detail": "Tunda pakan malam sampai hitungan Vibrio turun." },
-    { "title": "Tebar probiotik Bacillus malam ini" },
-    { "title": "Hitung ulang Vibrio besok pagi (TCBS)" }
+    { "title": "Kurangi pakan Kolam A3 20–30%", "detail": "Sisa pakan memberi makan bakteri berpendar." },
+    { "title": "Tebar probiotik malam ini" },
+    { "title": "Senter lagi besok malam" }
   ]
 }
 ```
@@ -177,8 +167,9 @@ Aturan isi (supaya cocok dengan UI teknisi yang dibuat sederhana):
 - `summary`: 1–2 kalimat Bahasa Indonesia, tanpa emoji, tanpa markdown.
 - `steps`: 1–5 langkah, **urut dari yang paling mendesak**. `title` berupa perintah singkat yang bisa
   langsung dikerjakan teknisi di kolam (≤ 80 karakter); `detail` opsional (≤ 160 karakter).
-- Jangan menyarankan tindakan yang butuh sensor/perangkat otomatis atau pengukuran pH/DO/suhu —
-  aplikasi ini hanya mencatat bakteri, plankton, dan hasil qPCR.
+- Hanya tindakan yang bisa dikerjakan di kolam tanpa alat ukur: atur pakan, probiotik, sipon,
+  ganti air, serok kotoran/alga, angkat udang lemas, kabari pemilik. Jangan menyarankan sensor,
+  pengukuran pH/DO/suhu, uji lab, atau qPCR.
 - Respons dengan bentuk lain dianggap gagal dan aplikasi tetap memakai saran bawaan.
 
 ---

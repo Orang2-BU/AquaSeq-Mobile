@@ -46,7 +46,7 @@ export function TeknisiHome({ farm }: { farm: FarmView }) {
             <ClipboardCheck size={24} color={colors.white} strokeWidth={2.4} />
             <View style={{ flex: 1 }}>
               <Text style={styles.ctaTitle}>Cek Kolam Sekarang</Text>
-              <Text style={styles.ctaSub}>Isi hitungan Vibrio & plankton — langsung dapat saran</Text>
+              <Text style={styles.ctaSub}>Lihat warna air & udang — langsung dapat saran</Text>
             </View>
             <ArrowRight size={22} color={colors.white} strokeWidth={2.4} />
           </LinearGradient>

@@ -1,5 +1,5 @@
 // Model data aplikasi. Bentuk ini juga kontrak dengan backend (lihat docs/API-CONTRACT.md).
-import { PARAMS, PARAM_ORDER, fmtParam, shortName, type ParamKey } from './params';
+import { PARAM_ORDER, fmtParam, optionOf, shortName, type ParamKey } from './params';
 
 export type Role = 'teknisi' | 'pemilik';
 export type PondStatus = 'SEHAT' | 'WASPADA' | 'KRITIS';
@@ -19,12 +19,12 @@ export type Pond = {
   abwGram: number;       // berat rata-rata udang dari sampling terakhir (gram)
 };
 
-/** Satu kali input mandiri: hitung koloni, hitung plankton, atau hasil qPCR (0 = negatif, 1 = positif). */
+/** Satu kali pengamatan visual teknisi. `values` berisi kode pilihan per pengamatan (lihat params.ts). */
 export type Reading = {
   id: string;
   pondId: string;
   at: string;            // ISO 8601
-  by: string;            // nama petugas / "Lab"
+  by: string;            // nama petugas / shift
   values: Partial<Record<ParamKey, number>>;
   synced: boolean;       // false = baru tersimpan di perangkat
 };
@@ -33,14 +33,13 @@ export type Task = { id: string; title: string; time: string; note: string; done
 
 export type RiskScore = { pondId: string; score: number; label: 'Tinggi' | 'Sedang' | 'Rendah'; context: string };
 
-export type RecIcon = 'wind' | 'wheat' | 'flask' | 'droplet' | 'shovel' | 'microscope';
+export type RecIcon = 'wheat' | 'flask' | 'droplet' | 'shovel' | 'eye';
 export type Recommendation = { id: string; icon: RecIcon; text: string };
 
 export type FarmSnapshot = {
   farm: Farm;
   ponds: Pond[];
-  readings: Reading[];   // riwayat pengecekan (hitung bakteri, plankton, qPCR), termasuk yang terbaru
-  labTitle: string;      // judul ringkasan qPCR, mis. "Hasil Lab qPCR · DOC 42"
+  readings: Reading[];   // riwayat pengamatan, termasuk yang terbaru
   riskScores: RiskScore[];
   recommendations: Recommendation[];
   tasks: Task[];
@@ -49,10 +48,8 @@ export type FarmSnapshot = {
 
 export type Issue = {
   param: ParamKey;
-  value: number;
+  value: number;          // kode pilihan
   severity: Exclude<PondStatus, 'SEHAT'>;
-  direction: 'rendah' | 'tinggi';
-  limit: number;
 };
 
 export type MitigationStep = { title: string; detail?: string };
@@ -67,17 +64,14 @@ export type Mitigation = {
 
 export const statusRank: Record<PondStatus, number> = { KRITIS: 0, WASPADA: 1, SEHAT: 2 };
 
-/** Nilai di luar batas pada satu pengecekan, yang paling parah dulu. */
+/** Pengamatan yang tidak sehat, yang paling parah dulu. Status tiap pilihan ada di params.ts. */
 export function evaluate(values: Reading['values']): Issue[] {
   const issues: Issue[] = [];
   for (const key of PARAM_ORDER) {
     const v = values[key];
     if (v === undefined) continue;
-    const { warn, crit } = PARAMS[key].limits;
-    if (crit.min !== undefined && v < crit.min) issues.push({ param: key, value: v, severity: 'KRITIS', direction: 'rendah', limit: warn.min ?? crit.min });
-    else if (crit.max !== undefined && v > crit.max) issues.push({ param: key, value: v, severity: 'KRITIS', direction: 'tinggi', limit: warn.max ?? crit.max });
-    else if (warn.min !== undefined && v < warn.min) issues.push({ param: key, value: v, severity: 'WASPADA', direction: 'rendah', limit: warn.min });
-    else if (warn.max !== undefined && v > warn.max) issues.push({ param: key, value: v, severity: 'WASPADA', direction: 'tinggi', limit: warn.max });
+    const status = optionOf(key, v)?.status ?? 'SEHAT';
+    if (status !== 'SEHAT') issues.push({ param: key, value: v, severity: status });
   }
   return issues.sort((a, b) => statusRank[a.severity] - statusRank[b.severity]);
 }
@@ -89,13 +83,12 @@ export function statusOf(issues: Issue[]): PondStatus {
 }
 
 export function paramStatus(key: ParamKey, value: number): PondStatus {
-  return statusOf(evaluate({ [key]: value }));
+  return optionOf(key, value)?.status ?? 'SEHAT';
 }
 
-/** "Vibrio 15.000 CFU/mL di atas batas 1.000" · "EHP positif (qPCR)" */
+/** "Udang menyala: banyak" · "Warna air: hijau pekat / kebiruan" */
 export function describeIssue(i: Issue): string {
-  if (PARAMS[i.param].kind === 'binary') return `${shortName(i.param)} positif (qPCR)`;
-  return `${shortName(i.param)} ${fmtParam(i.param, i.value)} ${i.direction === 'rendah' ? 'di bawah' : 'di atas'} batas ${fmtParam(i.param, i.limit, false)}`;
+  return `${shortName(i.param)}: ${fmtParam(i.param, i.value).toLowerCase()}`;
 }
 
 export function biomassKg(p: Pond): number {

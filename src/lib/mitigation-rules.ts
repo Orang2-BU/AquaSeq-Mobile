@@ -5,66 +5,64 @@ import type { ParamKey } from './params';
 
 type StepsFor = (i: Issue, pond: Pond) => MitigationStep[];
 
-const RULES: Partial<Record<ParamKey, StepsFor>> = {
-  Vibrio: (i, p) => [
-    { title: `Kurangi pakan ${p.name} 20–30%`, detail: 'Sisa pakan memberi makan Vibrio; tunda pakan malam sampai hitungan turun.' },
-    { title: 'Tebar probiotik Bacillus malam ini', detail: 'Dosis mengikuti SOP; Bacillus bersaing langsung dengan Vibrio.' },
-    { title: 'Sipon dasar kolam', detail: 'Kurangi lumpur dan bahan organik tempat Vibrio berkembang.' },
-    { title: 'Hitung ulang Vibrio besok pagi (TCBS)', detail: i.severity === 'KRITIS' ? 'Bila masih naik, ganti air 10–20% dan amati udang lemas di pinggir kolam.' : undefined },
+const RULES: Record<ParamKey, StepsFor> = {
+  WarnaAir: (i) => {
+    switch (i.value) {
+      case 2: // bening
+        return [
+          { title: 'Tebar fermentasi/pupuk untuk menumbuhkan plankton', detail: 'Ikuti SOP pemupukan tambak.' },
+          { title: 'Lihat lagi warna air 2 hari ke depan' },
+        ];
+      case 3: // hijau pekat / kebiruan
+        return [
+          { title: 'Ganti air 10–15%', detail: 'Kurangi alga biru-hijau yang bisa meracuni udang.' },
+          { title: 'Kurangi pakan 10–20% sampai warna air membaik' },
+          { title: 'Tebar probiotik untuk menyeimbangkan plankton' },
+        ];
+      case 4: // putih susu / keruh
+        return [
+          { title: 'Ganti air 10–20%' },
+          { title: 'Kurangi pakan 20% dan sipon dasar kolam', detail: 'Air keruh putih tanda bakteri berlebih dari sisa pakan.' },
+        ];
+      case 5: // merah kecoklatan
+        return [
+          { title: 'Ganti air 20% hari ini', detail: 'Alga merah bisa membuat udang stres dan mati mendadak.' },
+          { title: 'Kurangi pakan 30% dan amati udang di pinggir kolam' },
+          { title: 'Kabari pemilik tambak' },
+        ];
+      default:
+        return [];
+    }
+  },
+  LapisanAlga: () => [
+    { title: 'Serok lapisan alga di sudut kolam pagi ini' },
+    { title: 'Ganti air 10% dan kurangi pakan 10%' },
   ],
-  VibrioHijau: (_i, p) => [
-    { title: `Kurangi pakan ${p.name} 20–30%` },
-    { title: 'Tebar probiotik Bacillus malam ini' },
-    { title: 'Kirim sampel udang & air ke lab untuk qPCR AHPND', detail: 'Vibrio koloni hijau sering terkait V. parahaemolyticus.' },
-  ],
-  TotalBakteri: () => [
+  UdangMenyala: (i, p) => [
+    { title: `Kurangi pakan ${p.name} 20–30%`, detail: 'Sisa pakan memberi makan bakteri berpendar.' },
+    { title: 'Tebar probiotik malam ini', detail: 'Dosis mengikuti SOP tambak.' },
     { title: 'Sipon dasar kolam' },
-    { title: 'Kurangi pakan 10–20%' },
-    { title: 'Tebar probiotik pengurai bahan organik' },
+    { title: 'Senter lagi besok malam', detail: i.severity === 'KRITIS' ? 'Bila masih banyak, ganti air 10–20% dan angkat udang yang lemas.' : undefined },
   ],
-  Bacillus: () => [
-    { title: 'Tebar ulang probiotik Bacillus', detail: 'Populasi probiotik rendah membuat Vibrio mudah naik.' },
-    { title: 'Hitung ulang Bacillus 2–3 hari lagi' },
+  KotoranPutih: (_i, p) => [
+    { title: `Puasakan ${p.name} satu kali pakan, lalu beri pakan 50%` },
+    { title: 'Serok kotoran putih yang mengambang' },
+    { title: 'Tebar probiotik malam ini' },
   ],
-  Plankton: (i) => i.direction === 'rendah'
-    ? [
-      { title: 'Tebar fermentasi/pupuk untuk menumbuhkan plankton', detail: 'Ikuti SOP pemupukan tambak.' },
-      { title: 'Hitung ulang plankton 2 hari lagi' },
-    ]
-    : [
-      { title: 'Ganti air 10% untuk mengurangi plankton terlalu pekat' },
-      { title: 'Kurangi pakan 10% hari ini' },
-    ],
-  Diatom: () => [
-    { title: 'Tebar pupuk silikat untuk menumbuhkan diatom', detail: 'Ikuti SOP pemupukan tambak.' },
-  ],
-  BGA: (i) => [
-    { title: `Ganti air ${i.severity === 'KRITIS' ? '15–20%' : '10–15%'} untuk menurunkan alga biru-hijau` },
-    { title: 'Kurangi pakan 10–20% sampai dominasi turun' },
-    { title: 'Tebar probiotik & pupuk diatom', detail: 'Arahkan komposisi plankton ke diatom dan alga hijau.' },
-  ],
-  Dino: () => [
+  EkorMerah: () => [
+    { title: 'Angkat dan buang udang yang lemas atau mati' },
+    { title: 'Kurangi pakan 20% dan tebar probiotik' },
     { title: 'Ganti air 10–15%' },
-    { title: 'Kurangi pakan 10% dan hitung ulang plankton besok' },
   ],
-  WSSV: (_i, p) => [
-    { title: `Isolasi ${p.name}: jangan pindahkan air, alat, atau orang ke kolam lain`, detail: 'Gunakan alat khusus dan desinfeksi sepatu/tangan.' },
-    { title: 'Hubungi pemilik & ahli penyakit hari ini' },
-    { title: 'Siapkan rencana panen darurat bila udang mulai mati' },
+  InsangHitam: () => [
+    { title: 'Sipon dasar kolam', detail: 'Insang hitam karena dasar kolam kotor.' },
+    { title: 'Ganti air 10–15% dan kurangi pakan 10%' },
+    { title: 'Lihat lagi insang udang 2 hari ke depan' },
   ],
-  AHPND: (_i, p) => [
-    { title: `Isolasi ${p.name} dan hentikan pembuangan air ke saluran bersama` },
-    { title: 'Kurangi pakan 30–50% dan tebar probiotik' },
-    { title: 'Hubungi pemilik & ahli penyakit hari ini' },
-  ],
-  EHP: (_i, p) => [
-    { title: `Pantau pertumbuhan ${p.name}: sampling berat udang minggu ini`, detail: 'EHP memperlambat pertumbuhan; ukuran udang jadi tidak seragam.' },
-    { title: 'Jangan pakai air atau alat dari kolam ini untuk kolam lain' },
-    { title: 'Kirim sampel ulang ke lab untuk konfirmasi' },
-  ],
-  IHHNV: (_i, p) => [
-    { title: `Pantau udang kerdil/bengkok di ${p.name}` },
-    { title: 'Catat asal benur untuk siklus berikutnya' },
+  LumutTubuh: () => [
+    { title: 'Ganti air 10–20% untuk memacu udang ganti kulit' },
+    { title: 'Tebar kapur sesuai SOP', detail: 'Udang yang ganti kulit melepas lumut di tubuhnya.' },
+    { title: 'Kurangi pakan 10%' },
   ],
 };
 
@@ -73,8 +71,8 @@ export function localMitigation(pond: Pond, issues: Issue[]): Mitigation {
   if (!issues.length) {
     return {
       severity,
-      summary: `${pond.name} dalam batas aman. Lanjutkan jadwal hitung bakteri & plankton seperti biasa.`,
-      steps: [{ title: 'Hitung ulang sesuai jadwal berikutnya' }],
+      summary: `${pond.name} dalam batas aman. Lanjutkan cek warna air, anco, dan senter malam seperti biasa.`,
+      steps: [{ title: 'Cek lagi sesuai jadwal berikutnya' }],
       source: 'lokal',
     };
   }
@@ -82,7 +80,7 @@ export function localMitigation(pond: Pond, issues: Issue[]): Mitigation {
   const seen = new Set<string>();
   const steps: MitigationStep[] = [];
   for (const issue of issues) {
-    for (const step of RULES[issue.param]?.(issue, pond) ?? []) {
+    for (const step of RULES[issue.param](issue, pond)) {
       // Langkah serupa dari beberapa masalah (mis. "kurangi pakan") cukup sekali.
       const key = step.title.toLowerCase().replace(/kolam \w+/g, '').replace(/[\d–%-]+/g, '').trim().slice(0, 18);
       if (seen.has(key)) continue;

@@ -2,13 +2,14 @@
 
 Aplikasi React Native (Expo SDK 58, Expo Router) untuk dua peran:
 
-- **Teknisi tambak** — menginput hitungan mikroba kolam (Vibrio, Vibrio hijau, plankton, alga biru-hijau,
-  plus hitungan lain & hasil qPCR bila ada), langsung mendapat status kolam dan **saran mitigasi cepat** (AI bila online, aturan bawaan bila offline).
-- **Pemilik tambak** — melihat kondisi semua kolam lebih rinci: bakteri (Vibrio, TPC, Bacillus),
-  komposisi plankton, hasil qPCR (WSSV, AHPND, EHP, IHHNV), tren, biomassa, skor risiko, dan menjadwalkan rekomendasi untuk teknisi.
+- **Teknisi tambak** — mengamati kolam dengan mata (warna air, lapisan alga, udang menyala di malam hari,
+  kotoran putih, ekor merah, insang hitam, lumut di tubuh udang) cukup dengan mengetuk pilihan, lalu
+  langsung mendapat status kolam dan **saran mitigasi cepat** (AI bila online, aturan bawaan bila offline).
+- **Pemilik tambak** — melihat kondisi semua kolam lebih rinci: pengamatan tiap kolam, riwayat 7 hari,
+  biomassa, skor risiko, dan menjadwalkan rekomendasi untuk teknisi.
 
-Tidak ada fitur sensor/IoT (tidak ada pH, DO, suhu, dll.): data kolam adalah bakteri, plankton, dan
-patogen (qPCR) yang diinput mandiri.
+Tidak ada sensor/IoT, alat ukur, atau uji lab: semua data adalah pengamatan mata telanjang yang
+berpengaruh langsung ke udang.
 
 ## Menjalankan
 

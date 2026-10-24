@@ -19,57 +19,46 @@ const ponds: Pond[] = [
 
 type Values = Reading['values'];
 
-// Nilai pagi terbaru (hitung koloni TCBS + hitung plankton). Status kolam DIHITUNG dari nilai
-// terbaru (src/lib/domain.ts → evaluate): A3 kritis (Vibrio), B2 waspada (Vibrio),
-// C1 waspada (alga biru-hijau), D2 waspada (EHP positif dari qPCR), sisanya sehat.
-const normalMorning = { Vibrio: 450, VibrioHijau: 30, Plankton: 150_000, BGA: 8 };
-const normalAfternoon = { TotalBakteri: 120_000, Bacillus: 50_000, Diatom: 45, AlgaHijau: 35, Dino: 3 };
-
-// Tren 7 hari (indeks terakhir = hari ini).
-const morningTrend: Record<string, Partial<Record<keyof typeof normalMorning, number[]>>> = {
-  A3: { Vibrio: [3_000, 3_400, 3_200, 5_200, 8_100, 11_500, 15_000], VibrioHijau: [150, 180, 170, 320, 560, 880, 1_200] },
-  B2: { Vibrio: [600, 900, 1_500, 2_600, 4_800, 6_900, 8_500], VibrioHijau: [30, 40, 45, 55, 60, 70, 80] },
-  C1: { BGA: [10, 12, 15, 18, 22, 25, 28] },
-};
-const afternoonOverride: Record<string, Partial<typeof normalAfternoon>> = {
-  A3: { TotalBakteri: 650_000, Bacillus: 18_000 },
-  C1: { Diatom: 26, AlgaHijau: 30 },
-};
-// qPCR terakhir (23 Okt): 1 = positif.
-const pcrPositive: Record<string, Partial<Record<'WSSV' | 'AHPND' | 'EHP' | 'IHHNV', number>>> = {
-  D2: { EHP: 1 },
-};
-
+// Kode pilihan ada di params.ts. Warna air: 0 hijau cerah, 1 coklat muda, 3 hijau pekat/kebiruan.
+// Tingkat: 0 tidak ada, 1 sedikit, 2 banyak.
+// Status kolam DIHITUNG dari pengamatan terbaru (domain.ts → evaluate):
+// A3 kritis (udang menyala banyak), B2 waspada (ekor merah), C1 waspada (air hijau pekat + lapisan alga),
+// D2 waspada (insang hitam), sisanya sehat.
 const DAYS = ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24'];
-const wobble = [0.12, -0.08, 0.15, 0.05, -0.1, 0.06, 0];
-const jitter = (v: number, d: number) => Math.round(v * (1 + wobble[d]));
+
+type Morning = { WarnaAir: number; LapisanAlga: number; KotoranPutih: number; EkorMerah: number; InsangHitam: number; LumutTubuh: number };
+const healthyMorning = (pondIndex: number): Morning =>
+  ({ WarnaAir: pondIndex % 3 === 0 ? 1 : 0, LapisanAlga: 0, KotoranPutih: 0, EkorMerah: 0, InsangHitam: 0, LumutTubuh: 0 });
+
+// Tren 7 hari per pengamatan (indeks terakhir = hari ini / malam terakhir).
+const morningTrend: Record<string, Partial<Record<keyof Morning, number[]>>> = {
+  A3: { KotoranPutih: [0, 0, 0, 0, 1, 1, 1] },
+  B2: { EkorMerah: [0, 0, 0, 0, 0, 1, 1] },
+  C1: { WarnaAir: [0, 0, 0, 3, 3, 3, 3], LapisanAlga: [0, 0, 0, 0, 1, 1, 1] },
+  D2: { InsangHitam: [0, 0, 0, 0, 0, 0, 1] },
+};
+// Udang menyala dicek malam (20.00) — 6 malam, malam ini belum.
+const nightTrend: Record<string, number[]> = {
+  A3: [0, 0, 1, 1, 2, 2],
+};
 
 function history(): Reading[] {
   const out: Reading[] = [];
-  for (const pond of ponds) {
+  ponds.forEach((pond, pi) => {
     DAYS.forEach((day, d) => {
       const last = d === DAYS.length - 1;
       const morning: Values = {};
-      for (const [k, base] of Object.entries(normalMorning) as [keyof typeof normalMorning, number][]) {
-        morning[k] = morningTrend[pond.id]?.[k]?.[d] ?? jitter(base, d);
+      for (const [k, v] of Object.entries(healthyMorning(pi)) as [keyof Morning, number][]) {
+        morning[k] = morningTrend[pond.id]?.[k]?.[d] ?? v;
       }
       out.push({ id: `p-${pond.id}-${d}`, pondId: pond.id, at: `${day}T${last ? '06:42' : '06:30'}:00+07:00`, by: 'Shift pagi', synced: true, values: morning });
-
-      if (d === 5) {
-        out.push({
-          id: `q-${pond.id}`, pondId: pond.id, at: `${day}T10:00:00+07:00`, by: 'Lab qPCR', synced: true,
-          values: { WSSV: 0, AHPND: 0, EHP: 0, IHHNV: 0, ...pcrPositive[pond.id] },
-        });
-      }
-      if (last) return; // hitung bakteri & plankton sore hari ini belum dilakukan
-      const afternoon: Values = {};
-      const base = { ...normalAfternoon, ...afternoonOverride[pond.id] };
-      for (const [k, v] of Object.entries(base) as [keyof typeof normalAfternoon, number][]) {
-        afternoon[k] = k === 'Diatom' || k === 'AlgaHijau' || k === 'Dino' ? v : jitter(v, d);
-      }
-      out.push({ id: `s-${pond.id}-${d}`, pondId: pond.id, at: `${day}T14:00:00+07:00`, by: 'Mikroskop sore', synced: true, values: afternoon });
+      if (last) return; // cek malam hari ini belum dilakukan
+      out.push({
+        id: `m-${pond.id}-${d}`, pondId: pond.id, at: `${day}T20:00:00+07:00`, by: 'Shift malam', synced: true,
+        values: { UdangMenyala: nightTrend[pond.id]?.[d] ?? 0 },
+      });
     });
-  }
+  });
   return out;
 }
 
@@ -82,25 +71,24 @@ export const seedSnapshot: FarmSnapshot = {
   },
   ponds,
   readings: history(),
-  labTitle: 'Hasil Lab qPCR · DOC 42',
   riskScores: [
-    { pondId: 'A3', score: 82, label: 'Tinggi', context: 'Vibrio 15.000 CFU/mL · naik 4 hari berturut-turut' },
-    { pondId: 'B2', score: 54, label: 'Sedang', context: 'Vibrio 8.500 CFU/mL dan terus naik' },
-    { pondId: 'C1', score: 41, label: 'Sedang', context: 'Alga biru-hijau 28% dari total plankton' },
-    { pondId: 'A1', score: 18, label: 'Rendah', context: 'Bakteri dan plankton dalam batas' },
+    { pondId: 'A3', score: 82, label: 'Tinggi', context: 'Udang menyala banyak 2 malam berturut-turut · ada kotoran putih' },
+    { pondId: 'C1', score: 54, label: 'Sedang', context: 'Air hijau pekat & lapisan alga di permukaan' },
+    { pondId: 'B2', score: 41, label: 'Sedang', context: 'Sebagian udang ekor & kakinya memerah' },
+    { pondId: 'A1', score: 18, label: 'Rendah', context: 'Tidak ada tanda bakteri atau alga bermasalah' },
   ],
   recommendations: [
-    { id: 'r1', icon: 'wheat', text: 'Kurangi pakan Kolam A3 20% dan tebar probiotik Bacillus malam ini untuk menekan Vibrio.' },
-    { id: 'r2', icon: 'microscope', text: 'Hitung ulang Vibrio Kolam A3 dan B2 besok pagi (TCBS) untuk memastikan tren.' },
-    { id: 'r3', icon: 'droplet', text: 'Ganti air 10–15% di Kolam C1 untuk menurunkan dominasi alga biru-hijau.' },
-    { id: 'r4', icon: 'shovel', text: 'Sipon dasar Kolam A3 untuk mengurangi bahan organik tempat Vibrio berkembang.' },
-    { id: 'r5', icon: 'flask', text: 'Kirim sampel udang Kolam D2 ke lab untuk konfirmasi EHP dan cek pertumbuhan.' },
+    { id: 'r1', icon: 'wheat', text: 'Kurangi pakan Kolam A3 30% dan tebar probiotik malam ini untuk menekan bakteri berpendar.' },
+    { id: 'r2', icon: 'shovel', text: 'Sipon dasar Kolam A3 dan serok kotoran putih yang mengambang.' },
+    { id: 'r3', icon: 'droplet', text: 'Ganti air 10–15% di Kolam C1 dan serok lapisan alga di sudut kolam.' },
+    { id: 'r4', icon: 'eye', text: 'Periksa 20 ekor udang Kolam B2 dari anco; angkat udang lemas yang ekornya merah.' },
+    { id: 'r5', icon: 'flask', text: 'Tebar probiotik di Kolam D2 dan cek ulang insang udang besok pagi.' },
   ],
   tasks: [
-    { id: 't1', title: 'Hitung Vibrio & plankton pagi semua kolam', time: '06.30 WIB', note: 'Semua kolam', done: false },
+    { id: 't1', title: 'Cek warna air & anco pagi semua kolam', time: '06.30 WIB', note: 'Semua kolam', done: false },
     { id: 't2', title: 'Pakan pagi — total 45 kg', time: '07.00 WIB', note: 'Pakan pagi', done: false },
-    { id: 't3', title: 'Ambil sampel lab qPCR DOC 42 — A3 & B2', time: '10.00 WIB', note: 'Lab qPCR', done: false },
-    { id: 't4', title: 'Hitung total bakteri & komposisi plankton', time: '14.00 WIB', note: 'Mikroskop', done: false },
+    { id: 't3', title: 'Periksa 20 ekor udang Kolam A3 & B2 dari anco', time: '10.00 WIB', note: 'Anco', done: false },
+    { id: 't4', title: 'Senter kolam: cek udang menyala', time: '20.00 WIB', note: 'Semua kolam', done: false },
   ],
   feedTodayKg: 128,
 };

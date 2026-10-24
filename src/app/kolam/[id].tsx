@@ -1,14 +1,12 @@
-// Detail Kolam. Teknisi: saran mitigasi dulu, lalu 4 nilai utama dan tombol cek ulang.
-// Pemilik: saran + semua hasil per kelompok (bakteri/plankton/patogen qPCR), tren, riwayat.
+// Detail Kolam. Teknisi: saran mitigasi dulu, lalu pengamatan terbaru dan tombol cek ulang.
+// Pemilik: saran + pengamatan per kelompok (air/udang), riwayat 7 hari, daftar pengamatan.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Bug, ClipboardCheck, Dna, Leaf, TriangleAlert } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, ClipboardCheck, Droplets, Fish } from 'lucide-react-native';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Chip } from '@/components/Chip';
 import { FadeSlideIn } from '@/components/FadeSlideIn';
 import { MitigationCard } from '@/components/MitigationCard';
 import { PressScale } from '@/components/motion';
@@ -16,11 +14,9 @@ import { ParamTable } from '@/components/ParamTable';
 import { SlideView, useScreenSlide } from '@/components/ScreenSlide';
 import { Segmented } from '@/components/Segmented';
 import { StatusIconBadge, statusMeta, statusStroke } from '@/components/StatusIconBadge';
-import { TrendChart } from '@/components/TrendChart';
-import { easeOut } from '@/lib/animations';
-import { biomassKg, describeIssue, paramStatus, wibDay, wibTime } from '@/lib/domain';
-import { paramHistory, useFarm, useMitigation, type FarmView, type PondView } from '@/lib/farm';
-import { NUMERIC_PARAMS, PARAMS, PARAM_ORDER, QUICK_PARAMS, fmtParam, limitText, safeRange, shortName, type ParamGroup, type ParamKey } from '@/lib/params';
+import { biomassKg, paramStatus, wibDay, wibTime } from '@/lib/domain';
+import { dailyHistory, useFarm, useMitigation, type FarmView, type PondView } from '@/lib/farm';
+import { PARAMS, PARAM_ORDER, fmtParam, shortName, type ParamGroup, type ParamKey } from '@/lib/params';
 import { useStore } from '@/lib/store';
 import { card, colors, fonts, gradients, monoNums } from '@/lib/theme';
 
@@ -111,130 +107,83 @@ export default function DetailKolam() {
   );
 }
 
-/** Teknisi: 4 hitungan utama besar + masalah lain dari hitungan tambahan / qPCR (kalau ada). */
+/** Teknisi: semua pengamatan terbaru, dengan cara mengamatinya. */
 function TechSections({ view, start }: { view: PondView; start: number }) {
-  const kitIssues = view.issues.filter((x) => !PARAMS[x.param].quick);
   return (
-    <>
-      <FadeSlideIn index={start}>
-        <Text style={styles.section}>Kondisi terkini</Text>
-        <View style={styles.paramGrid}>
-          {QUICK_PARAMS.map((k) => {
-            const l = view.latest[k];
-            const st = l ? paramStatus(k, l.value) : 'SEHAT';
-            const bad = st !== 'SEHAT';
-            const m = statusMeta[st];
-            return (
-              <View key={k} style={[card, styles.param, bad ? statusStroke(st) : null]}>
-                <Text style={styles.paramLabel}>{shortName(k)}</Text>
-                <View style={styles.paramValueRow}>
-                  <Text style={[styles.paramValue, bad ? { color: m.color } : null]}>{l ? fmtParam(k, l.value, false) : '—'}</Text>
-                  {PARAMS[k].unit ? <Text style={styles.paramUnit}>{PARAMS[k].unit}</Text> : null}
-                </View>
-                {bad ? (
-                  <View style={styles.ctxRow}>
-                    <TriangleAlert size={14} color={m.color} strokeWidth={2.6} />
-                    <Text style={[styles.ctxText, { color: m.color }]}>Batas {safeRange(k)}</Text>
-                  </View>
-                ) : <Text style={styles.okText}>Aman</Text>}
-              </View>
-            );
-          })}
-        </View>
-      </FadeSlideIn>
-      {kitIssues.length ? (
-        <FadeSlideIn index={start + 1}>
-          <View style={card}>
-            <Text style={styles.cardTitle}>Dari hitungan lain & qPCR</Text>
-            {kitIssues.map((x) => {
-              const m = statusMeta[x.severity];
-              const Icon = m.icon;
-              return (
-                <View key={x.param} style={styles.kitRow}>
-                  <Icon size={16} color={m.color} strokeWidth={2.6} />
-                  <Text style={styles.kitText}>{describeIssue(x)}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </FadeSlideIn>
-      ) : null}
-    </>
+    <FadeSlideIn index={start}>
+      <Text style={styles.section}>Kondisi terkini</Text>
+      <View style={card}>
+        <ParamTable keys={PARAM_ORDER} latest={view.latest} showHint />
+      </View>
+    </FadeSlideIn>
   );
 }
 
 const GROUPS = [
-  { key: 'Bakteri', label: 'Bakteri', icon: Bug },
-  { key: 'Plankton', label: 'Plankton', icon: Leaf },
-  { key: 'Patogen', label: 'qPCR', icon: Dna },
+  { key: 'Air', label: 'Air kolam', icon: Droplets },
+  { key: 'Udang', label: 'Udang', icon: Fish },
 ] as const;
 
-const TREND_PARAMS = NUMERIC_PARAMS;
-
-/** Pemilik: semua hasil bakteri, plankton & qPCR, tren per parameter, riwayat pengecekan. */
+/** Pemilik: pengamatan per kelompok, riwayat 7 hari per pengamatan, dan daftar pengamatan. */
 function OwnerSections({ view, farm, start }: { view: PondView; farm: FarmView; start: number }) {
-  const [group, setGroup] = useState<ParamGroup>('Bakteri');
-  const firstIssue = view.issues[0]?.param;
-  const [param, setParam] = useState<ParamKey>(firstIssue && TREND_PARAMS.includes(firstIssue) ? firstIssue : 'Vibrio');
-  const [shownParam, setShownParam] = useState(param);
-  const chartOpacity = useSharedValue(1);
-
-  // Ganti parameter: grafik lama fade-out 120 ms, grafik baru fade-in 180 ms. Tanpa slide.
-  useEffect(() => {
-    if (param === shownParam) return;
-    chartOpacity.set(withTiming(0, { duration: 120 }));
-    const t = setTimeout(() => {
-      setShownParam(param);
-      chartOpacity.set(withTiming(1, { duration: 180, easing: easeOut }));
-    }, 120);
-    return () => clearTimeout(t);
-  }, [param, shownParam, chartOpacity]);
-  const chartStyle = useAnimatedStyle(() => ({ opacity: chartOpacity.get() }));
-
-  const series = paramHistory(farm, view.pond.id, shownParam).map((h) => ({ label: wibDay(h.at).split(',')[0], value: h.value }));
-  const values = series.map((s) => s.value);
+  const [group, setGroup] = useState<ParamGroup>(view.issues[0] ? PARAMS[view.issues[0].param].group : 'Air');
+  const keys = PARAM_ORDER.filter((k) => PARAMS[k].group === group);
   const history = farm.readings.filter((r) => r.pondId === view.pond.id).slice(-6).reverse();
+  const days = [...new Set(farm.readings.filter((r) => r.pondId === view.pond.id).map((r) => wibDay(r.at)))].slice(-7);
 
   return (
     <>
       <FadeSlideIn index={start}>
-        <Text style={styles.section}>Bakteri, plankton & patogen</Text>
+        <Text style={styles.section}>Pengamatan terbaru</Text>
         <Segmented items={GROUPS} value={group} onChange={setGroup} tone="light" />
         <View style={[card, { marginTop: 12 }]}>
-          <ParamTable keys={PARAM_ORDER.filter((k) => PARAMS[k].group === group)} latest={view.latest} />
+          <ParamTable keys={keys} latest={view.latest} />
         </View>
       </FadeSlideIn>
 
       <FadeSlideIn index={start + 1}>
         <View style={card}>
-          <Text style={styles.chartTitle}>TREN {PARAMS[shownParam].label.toUpperCase()}</Text>
-          <Text style={styles.chartNote}>Dari input mandiri · {limitText(shownParam).replace(/^./, (ch) => ch.toLowerCase())}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendChips}>
-            {TREND_PARAMS.map((k) => <Chip key={k} label={shortName(k)} active={k === param} onPress={() => setParam(k)} />)}
-          </ScrollView>
-          <Animated.View style={chartStyle}>
-            <TrendChart param={shownParam} data={series} />
-            {values.length ? (
-              <Text style={styles.legend}>
-                Terakhir <Text style={styles.legendNum}>{fmtParam(shownParam, values[values.length - 1])}</Text>
-                {'  ·  '}Terendah <Text style={styles.legendNum}>{fmtParam(shownParam, Math.min(...values), false)}</Text>
-                {'  ·  '}Tertinggi <Text style={styles.legendNum}>{fmtParam(shownParam, Math.max(...values), false)}</Text>
-              </Text>
-            ) : null}
-          </Animated.View>
+          <Text style={styles.cardTitle}>Riwayat 7 hari</Text>
+          <View style={styles.gridHead}>
+            <View style={styles.gridLabelCol} />
+            {days.map((d) => <Text key={d} style={styles.gridDay}>{d.split(',')[0]}</Text>)}
+          </View>
+          {keys.map((k) => {
+            const byDay = new Map(dailyHistory(farm, view.pond.id, k).map((h) => [h.day, h.value]));
+            return (
+              <View key={k} style={styles.gridRow}>
+                <Text style={styles.gridLabel} numberOfLines={2}>{shortName(k)}</Text>
+                {days.map((d) => {
+                  const v = byDay.get(d);
+                  const st = v === undefined ? null : paramStatus(k, v);
+                  const m = st ? statusMeta[st] : null;
+                  const Icon = m?.icon;
+                  return (
+                    <View
+                      key={d}
+                      style={[styles.gridCell, { backgroundColor: m ? m.tint : '#EEF2F8' }]}
+                      accessibilityLabel={`${shortName(k)} ${d}: ${v === undefined ? 'belum dicek' : fmtParam(k, v)}`}
+                    >
+                      {m && Icon ? <Icon size={14} color={m.color} strokeWidth={2.8} /> : <Text style={styles.gridEmpty}>–</Text>}
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })}
         </View>
       </FadeSlideIn>
 
       <FadeSlideIn index={start + 2}>
         <View style={card}>
-          <Text style={styles.cardTitle}>Riwayat pengecekan</Text>
+          <Text style={styles.cardTitle}>Riwayat pengamatan</Text>
           {history.map((r) => (
             <View key={r.id} style={styles.histRow}>
               <Text style={styles.histTime}>{wibTime(r.at)}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.histTitle}>{wibDay(r.at)} · {r.by}{r.synced ? '' : ' · belum terkirim'}</Text>
                 <Text style={styles.histSub}>
-                  {Object.entries(r.values).map(([k, v]) => `${shortName(k as ParamKey)} ${fmtParam(k as ParamKey, v as number, false)}`).join(' · ')}
+                  {Object.entries(r.values).map(([k, v]) => `${shortName(k as ParamKey)}: ${fmtParam(k as ParamKey, v as number).toLowerCase()}`).join(' · ')}
                 </Text>
               </View>
             </View>
@@ -269,22 +218,13 @@ const styles = StyleSheet.create({
   statValue: { fontFamily: fonts.monoBold, fontSize: 14, color: colors.ink, ...monoNums },
   section: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, marginBottom: 10 },
   cardTitle: { fontFamily: fonts.display, fontSize: 17, color: colors.ink, marginBottom: 6 },
-  paramGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  param: { width: '47%', flexGrow: 1, gap: 6 },
-  paramLabel: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.slate },
-  paramValueRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 },
-  paramValue: { fontFamily: fonts.monoBold, fontSize: 26, color: colors.ink, ...monoNums },
-  paramUnit: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate },
-  ctxRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ctxText: { fontFamily: fonts.bodyBold, fontSize: 13 },
-  okText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.green },
-  kitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
-  kitText: { flex: 1, fontFamily: fonts.bodySemi, fontSize: 14, lineHeight: 20, color: colors.ink },
-  chartTitle: { fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 0.8, color: colors.ink },
-  chartNote: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.slate, marginTop: 4 },
-  trendChips: { gap: 8, marginTop: 12, marginBottom: 8 },
-  legend: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.slate, marginTop: 6 },
-  legendNum: { fontFamily: fonts.monoBold, color: colors.ink, ...monoNums },
+  gridHead: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, marginBottom: 4 },
+  gridLabelCol: { width: 92 },
+  gridDay: { flex: 1, fontFamily: fonts.bodySemi, fontSize: 11, color: colors.slate, textAlign: 'center' },
+  gridRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
+  gridLabel: { width: 92, fontFamily: fonts.bodySemi, fontSize: 12, lineHeight: 16, color: colors.ink },
+  gridCell: { flex: 1, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  gridEmpty: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.slate },
   histRow: { flexDirection: 'row', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
   histTime: { fontFamily: fonts.monoBold, fontSize: 14, color: colors.navy, width: 48, ...monoNums },
   histTitle: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
