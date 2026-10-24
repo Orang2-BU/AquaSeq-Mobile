@@ -87,6 +87,58 @@ Nilai `EXPO_PUBLIC_*` ditanam saat build. Setelah mengubah `.env`, jalankan ulan
 Sebelum rilis ke Play Store: pastikan `android.package` di `app.json` (sekarang `com.aquaseq.app`)
 sudah benar — **tidak bisa diubah** setelah terbit.
 
+## CI/CD — GitHub Actions (Android APK)
+
+Workflow: `.github/workflows/android.yml`.
+
+- Pull request ke `main`: install dari lockfile, lint, bundle Android, typecheck; tanpa token Expo.
+- Push ke `main`: checks yang sama, lalu EAS Build profil `preview` (APK, bukan AAB).
+- Manual: **Actions → Android APK → Run workflow**, pilih branch yang dipercaya.
+- Workflow menunggu build selesai; build gagal/dibatalkan atau APK tidak tersedia membuat job gagal.
+- Hasil: **Actions → run → Artifacts → AquaSeq-APK-<commit>**, ekstrak `AquaSeq.apk`.
+  Artifact disimpan 14 hari. Tidak ada submit Play Store, deploy web, atau OTA update.
+
+### Setup sekali sebelum build CI
+
+1. Tautkan akun/proyek Expo dari terminal lokal:
+
+   ```bash
+   npx eas-cli@25.3.0 login
+   npx eas-cli@25.3.0 init
+   ```
+
+   `init` menambahkan `expo.extra.eas.projectId` ke `app.json`; jangan isi ID asal.
+   Sertakan perubahan `app.json` bersama workflow saat lo commit/push nanti.
+
+2. Untuk APK yang terhubung backend, atur `EXPO_PUBLIC_API_URL` di environment EAS
+   **preview**. Opsional: `EXPO_PUBLIC_AI_URL`. Nilai `EXPO_PUBLIC_*` bersifat publik,
+   tertanam di APK; jangan isi API key atau password. Tanpa URL API, APK memakai mode demo.
+   Variabel GitHub Actions tidak otomatis menjadi variabel build di server EAS.
+
+3. Jalankan build pertama secara interaktif untuk menyiapkan signing Android dan versi remote:
+
+   ```bash
+   npx eas-cli@25.3.0 build --platform android --profile preview
+   ```
+
+   Tunggu sampai berhasil. Gunakan keystore proyek yang sama untuk build berikutnya;
+   mengganti keystore bisa membuat APK tidak dapat memperbarui instalasi lama.
+   CI memakai `--freeze-credentials`, tidak membuat/mengubah signing secara otomatis.
+
+4. Buat access token di pengaturan akun Expo yang memiliki akses build proyek.
+   Di GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**,
+   nama `EXPO_TOKEN`. Simpan nilainya langsung di GitHub; jangan ke kode atau chat.
+
+5. Setelah workflow tersedia di default branch, jalankan manual dari tab Actions.
+   Push ke `main` berikutnya otomatis memicu APK setelah checks lolos.
+   Build memakai kuota/biaya EAS serta menit GitHub Actions; antrean EAS ikut dihitung
+   dalam timeout job 120 menit. Membatalkan job GitHub tidak otomatis membatalkan build EAS;
+   batalkan juga dari dashboard Expo bila masih berjalan.
+
+Validasi workflow setelah mengedit: `actionlint .github/workflows/android.yml`.
+Dokumentasi resmi: [EAS Build dari CI](https://docs.expo.dev/build/building-on-ci/),
+[APK Android](https://docs.expo.dev/build-reference/apk/).
+
 ## Deploy web (EAS Hosting)
 
 ```bash
