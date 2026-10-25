@@ -16,8 +16,9 @@ export function PemilikHome({ farm }: { farm: FarmView }) {
   const insets = useSafeAreaInsets();
   const problems = farm.ponds.filter((p) => p.status !== 'SEHAT');
   const top = [...farm.riskScores].sort((a, b) => b.score - a.score)[0];
-  const totalBiomass = farm.ponds.reduce((s, v) => s + biomassKg(v.pond), 0);
-  const avgSr = farm.ponds.reduce((s, v) => s + v.pond.srPercent, 0) / Math.max(farm.ponds.length, 1);
+  const totalBiomass = farm.ponds.reduce((s, v) => s + (biomassKg(v.pond) ?? 0), 0);
+  const validSrPonds = farm.ponds.filter((v) => v.pond.srPercent != null);
+  const avgSr = validSrPonds.length > 0 ? validSrPonds.reduce((s, v) => s + v.pond.srPercent!, 0) / validSrPonds.length : null;
   const totalArea = farm.ponds.reduce((s, v) => s + v.pond.areaM2, 0);
   const recent = [...farm.readings].reverse().slice(0, 5);
 
@@ -38,11 +39,11 @@ export function PemilikHome({ farm }: { farm: FarmView }) {
 
       <FadeSlideIn index={i++}>
         <View style={[card, styles.stats]}>
-          <Stat label="Biomassa est." value={`${totalBiomass.toLocaleString('id-ID')} kg`} />
+          <Stat label="Biomassa est." value={totalBiomass > 0 ? `${totalBiomass.toLocaleString('id-ID')} kg` : 'Belum ada'} />
           <View style={styles.statDivider} />
-          <Stat label="Rata-rata SR" value={`${avgSr.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`} />
+          <Stat label="Rata-rata SR" value={avgSr != null ? `${avgSr.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : 'Belum ada'} />
           <View style={styles.statDivider} />
-          <Stat label="Pakan hari ini" value={`${farm.feedTodayKg} kg`} />
+          <Stat label="Pakan hari ini" value={farm.feedTodayKg != null ? `${farm.feedTodayKg} kg` : 'Belum ada'} />
         </View>
         <Text style={styles.statNote}>
           Luas total {(totalArea / 10_000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} ha · biomassa dihitung dari tebar × SR × berat rata-rata sampling.
