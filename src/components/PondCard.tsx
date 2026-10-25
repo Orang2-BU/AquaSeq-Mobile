@@ -41,9 +41,9 @@ export function PondCard({ view, detailed, onOpen }: { view: PondView; detailed:
         <View style={styles.stats}>
           <Stat label="DOC" value={`${pond.docDays} hari`} />
           <View style={styles.statDivider} />
-          <Stat label="SR" value={`${pond.srPercent}%`} />
+          <Stat label="SR" value={pond.srPercent != null ? `${pond.srPercent}%` : '–'} />
           <View style={styles.statDivider} />
-          <Stat label="BIOMASSA" value={`${biomassKg(pond).toLocaleString('id-ID')} kg`} />
+          <Stat label="BIOMASSA" value={biomassKg(pond) != null ? `${biomassKg(pond)!.toLocaleString('id-ID')} kg` : '–'} />
         </View>
       ) : null}
 

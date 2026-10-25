@@ -48,6 +48,7 @@
     "web": "expo start --web",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
+    "test": "node --test src/lib/*.test.cjs",
     "export:web": "expo export -p web --clear",
     "deploy:web": "expo export -p web --clear && npx eas-cli@latest deploy --prod",
     "build:apk": "npx eas-cli@latest build -p android --profile preview",

@@ -27,7 +27,7 @@ export default function DetailKolam() {
   const farm = useFarm();
   const role = useStore().session?.user.role;
   const { style: slideStyle, leave } = useScreenSlide();
-  const view = farm?.byId[String(id).toUpperCase()];
+  const view = farm?.byId[String(id)] ?? farm?.byId[String(id).toUpperCase()];
   const { mitigation, ai } = useMitigation(view, farm);
 
   const goBack = () => leave(() => (router.canGoBack() ? router.back() : router.replace('/kolam')));
@@ -66,11 +66,11 @@ export default function DetailKolam() {
               {role === 'pemilik' ? (
                 <View style={styles.stats}>
                   <Stat label="DOC" value={`${pond.docDays} hari`} />
-                  <Stat label="SR" value={`${pond.srPercent}%`} />
+                  <Stat label="SR" value={pond.srPercent != null ? `${pond.srPercent}%` : 'Belum ada'} />
                   <Stat label="Luas" value={`${pond.areaM2.toLocaleString('id-ID')} m²`} />
-                  <Stat label="Tebar" value={`${(pond.stockedCount / 1000).toLocaleString('id-ID')} rb ekor`} />
-                  <Stat label="Berat rata-rata" value={`${pond.abwGram.toLocaleString('id-ID')} g`} />
-                  <Stat label="Biomassa est." value={`${biomassKg(pond).toLocaleString('id-ID')} kg`} />
+                  <Stat label="Tebar" value={pond.stockedCount != null ? `${(pond.stockedCount / 1000).toLocaleString('id-ID')} rb ekor` : 'Belum ada'} />
+                  <Stat label="Berat rata-rata" value={pond.abwGram != null ? `${pond.abwGram.toLocaleString('id-ID')} g` : 'Belum ada'} />
+                  <Stat label="Biomassa est." value={biomassKg(pond) != null ? `${biomassKg(pond)!.toLocaleString('id-ID')} kg` : 'Belum ada'} />
                 </View>
               ) : null}
             </View>

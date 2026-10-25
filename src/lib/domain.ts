@@ -13,10 +13,10 @@ export type Pond = {
   name: string;          // 'Kolam A3'
   blok: string;          // 'A'
   docDays: number;       // umur budidaya (Day of Culture), hari
-  srPercent: number;     // survival rate dari sampling manual
+  srPercent: number | null;     // survival rate dari sampling manual
   areaM2: number;
-  stockedCount: number;  // jumlah benur ditebar (ekor)
-  abwGram: number;       // berat rata-rata udang dari sampling terakhir (gram)
+  stockedCount: number | null;  // jumlah benur ditebar (ekor)
+  abwGram: number | null;       // berat rata-rata udang dari sampling terakhir (gram)
 };
 
 /** Satu kali pengamatan visual teknisi. `values` berisi kode pilihan per pengamatan (lihat params.ts). */
@@ -91,7 +91,8 @@ export function describeIssue(i: Issue): string {
   return `${shortName(i.param)}: ${fmtParam(i.param, i.value).toLowerCase()}`;
 }
 
-export function biomassKg(p: Pond): number {
+export function biomassKg(p: Pond): number | null {
+  if (p.stockedCount == null || p.srPercent == null || p.abwGram == null) return null;
   return Math.round((p.stockedCount * (p.srPercent / 100) * p.abwGram) / 1000);
 }
 
